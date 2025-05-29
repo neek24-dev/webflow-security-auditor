@@ -15,17 +15,37 @@
       padding: 0;
       overflow: hidden;
       height: auto;
+      width: auto;
     }
     /* Remove scrollbar from results div and allow content to expand */
     #results {
       overflow: visible !important;
       height: auto !important;
+      width: auto !important;
       flex: none !important;
     }
     /* Ensure container adjusts to content */
     .container {
       min-height: auto;
       height: auto;
+      width: 100%;
+      max-width: none;
+    }
+    /* Make content responsive */
+    .container > div {
+      width: 100%;
+      max-width: 100%;
+    }
+    /* Ensure child elements don't overflow */
+    .container * {
+      box-sizing: border-box;
+      max-width: 100%;
+      word-wrap: break-word;
+    }
+    /* Adjust buttons and inputs for smaller widths */
+    .flex.space-x-2 {
+      flex-wrap: wrap;
+      gap: 0.5rem;
     }
   </style>
 </head>
@@ -95,10 +115,36 @@
     // Function to resize iframe dynamically
     function resizeIframe() {
       if (webflow && webflow.resize) {
-        const height = document.body.scrollHeight + 20; // Add padding for safety
-        webflow.resize({ height: height });
+        // Calculate dimensions
+        const height = document.documentElement.scrollHeight + 20; // Add padding
+        const width = document.documentElement.scrollWidth + 20;   // Add padding
+        // Attempt to resize both dimensions
+        try {
+          webflow.resize({ height: height, width: width });
+          console.log(`Resized iframe to height: ${height}px, width: ${width}px`);
+        } catch (error) {
+          console.error('Error resizing iframe:', error);
+          // Fallback: Display a message
+          const resultsDiv = document.getElementById('resultsContent');
+          if (!resultsDiv.innerHTML.includes('Iframe resizing not supported')) {
+            resultsDiv.innerHTML += '<p class="text-yellow-600">Iframe resizing not supported by Webflow SDK. Content may be clipped.</p>';
+          }
+        }
+      } else {
+        console.warn('Webflow SDK or resize method not available.');
       }
     }
+
+    // Debounce resize to avoid excessive calls
+    function debounce(func, wait) {
+      let timeout;
+      return function (...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+      };
+    }
+
+    const debouncedResizeIframe = debounce(resizeIframe, 100);
 
     // Display results with severity, snippets, and remediation
     function displayResults(results, type) {
@@ -130,7 +176,7 @@
       }
 
       // Resize iframe after content updates
-      setTimeout(resizeIframe, 0);
+      debouncedResizeIframe();
     }
 
     // Custom Code Analysis
@@ -359,7 +405,7 @@
       }
 
       // Resize iframe after injection
-      setTimeout(resizeIframe, 0);
+      debouncedResizeIframe();
     }
 
     // Detect Implemented Headers
@@ -510,6 +556,9 @@
       displayResults(issues, 'sorted');
     });
 
+    // Resize on window resize or content change
+    window.addEventListener('resize', debouncedResizeIframe);
+
     // Initialize App
     document.addEventListener('DOMContentLoaded', () => {
       if (!webflow) {
@@ -520,7 +569,7 @@
       setupTabs();
       document.getElementById('tabCode').click();
       // Initial resize
-      resizeIframe();
+      debouncedResizeIframe();
     });
   </script>
 </body>
