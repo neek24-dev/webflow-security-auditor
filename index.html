@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Webflow Security Auditor</title>
+  <!-- Tailwind CSS CDN for styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Webflow Apps SDK (assumed injected by Webflow) -->
+  <script src="https://sdk.webflow.com/js/webflow-apps.js"></script>
+</head>
+<body class="bg-gray-100 font-sans">
+  <div class="container mx-auto p-4 h-screen flex flex-col">
+    <!-- Dashboard Header -->
+    <h1 class="text-2xl font-bold mb-4">Webflow Security Auditor</h1>
+    <div class="flex flex-col space-y-4 flex-grow">
+      <!-- Navigation Tabs -->
+      <div class="flex space-x-2 border-b">
+        <button id="tabCode" class="tab-btn px-4 py-2 font-semibold text-blue-600 border-b-2 border-blue-600">Custom Code</button>
+        <button id="tabResources" class="tab-btn px-4 py-2 font-semibold text-gray-600">External Resources</button>
+        <button id="tabHeaders" class="tab-btn px-4 py-2 font-semibold text-gray-600">Security Headers</button>
+      </div>
+      <!-- Scan Controls -->
+      <div class="flex space-x-2">
+        <button id="runScanBtn" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+          Run Full Scan
+        </button>
+        <select id="severityFilter" class="border rounded px-2 py-1">
+          <option value="all">All Severities</option>
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+          <option value="Informational">Informational</option>
+        </select>
+        <button id="sortIssuesBtn" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+          Sort by Severity
+        </button>
+      </div>
+      <!-- Progress Indicator -->
+      <div id="progress" class="hidden text-blue-600 font-semibold"></div>
+      <!-- Results Display -->
+      <div id="results" class="bg-white p-4 rounded shadow flex-grow overflow-auto">
+        <h2 class="text-xl font-semibold mb-2">Security Audit Results</h2>
+        <div id="resultsContent" class="text-gray-700"></div>
+      </div>
+      <!-- Contextual Help -->
+      <div class="text-sm text-gray-600">
+        <p>Need help? <a href="https://owasp.org/www-project-top-ten/" target="_blank" class="text-blue-600 underline">Learn about web security</a> or <a href="https://webflow.com/docs" target="_blank" class="text-blue-600 underline">Webflow documentation</a>.</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Initialize Webflow Apps SDK
+    const webflow = window.WebflowApps;
+
+    // Mock trusted/malicious domains (replace with backend API in production)
+    const trustedDomains = ['cdn.jsdelivr.net', 'unpkg.com'];
+    const maliciousDomains = ['example-malicious.com']; // Replace with real data
+
+    // Severity levels
+    const SEVERITY = {
+      High: 'High (Critical: Immediate action required)',
+      Medium: 'Medium (Important: Address soon)',
+      Low: 'Low (Minor: Consider fixing)',
+      Informational: 'Informational (Best practice)'
+    };
+
+    // Store issues for filtering/sorting
+    let issues = [];
+
+    // Display results with severity, snippets, and remediation
+    function displayResults(results, type) {
+      const resultsDiv = document.getElementById('resultsContent');
+      const filter = document.getElementById('severityFilter').value;
+      
+      let filteredIssues = filter === 'all' ? results : results.filter(issue => issue.severity === filter);
+      
+      if (document.getElementById('sortIssuesBtn').dataset.sorted === 'true') {
+        filteredIssues.sort((a, b) => {
+          const severityOrder = ['High', 'Medium', 'Low', 'Informational'];
+          return severityOrder.indexOf(a.severity) - severityOrder.indexOf(b.severity);
+        });
+      }
+
+      if (filteredIssues.length === 0) {
+        resultsDiv.innerHTML = `<p>No ${type} issues found for the selected severity.</p>`;
+        return;
+      }
+
+      resultsDiv.innerHTML = filteredIssues.map(issue => `
+        <div class="mb-4 p-2 border-l-4 ${issue.severity === 'High' ? 'border-red-600' : issue.severity === 'Medium' ? 'border-yellow-600' : 'border-gray-400'}">
+          <p class="font-bold text-${issue.severity === 'High' ? 'red' : issue.severity === 'Medium' ? 'yellow' : 'gray'}-600">${issue.severity}: ${issue.title}</p>
+          <p>${issue.description}</p>
+          ${issue.snippet ? `<pre class="bg-gray-100 p-2 rounded">${issue.snippet}</pre>` : ''}
+          <p><strong>Location:</strong> ${issue.location || 'N/A'}</p>
+          <p><strong>Remediation:</strong> ${issue.remediation}</p>
+        </div>
+      `).join('');
+    }
+
+    // Custom Code Analysis
+    async function analyzeCustomCode() {
+      const resultsDiv = document.getElementById('resultsContent');
+      const progressDiv = document.getElementById('progress');
+      progressDiv.classList.remove('hidden');
+      progressDiv.textContent = 'Analyzing custom code...';
+      issues = [];
+
+      try {
+        const siteData = await webflow.getSiteCustomCode();
+        const pages = await webflow.getAllPages();
+        let customCode = (siteData?.head || '') + (siteData?.footer || '');
+
+        // Include page-specific embeds
+        pages.forEach(page => {
+          if (page.customEmbeds) {
+            customCode += page.customEmbeds.join('');
+          }
+        });
+
+        if (!customCode) {
+          issues.push({
+            severity: SEVERITY.Informational,
+            title: 'No Custom Code Found',
+            description: 'No custom code detected in head, footer, or page embeds.',
+            location: 'Site-wide',
+            remediation: 'No action needed.'
+          });
+        } else {
+          // Dangerous function detection
+          if (customCode.includes('eval(')) {
+            issues.push({
+              severity: SEVERITY.High,
+              title: 'Use of eval() Detected',
+              description: 'The eval() function can execute arbitrary code, leading to XSS vulnerabilities.',
+              snippet: customCode.match(/eval\([^)]+\)/g)?.[0] || '',
+              location: 'Custom Code',
+              remediation: 'Replace eval() with safer alternatives like JSON.parse or structured data handling.'
+            });
+          }
+          if (customCode.includes('document.write(')) {
+            issues.push({
+              severity: SEVERITY.Medium,
+              title: 'Use of document.write() Detected',
+              description: 'document.write() can cause performance issues and potential XSS risks.',
+              snippet: customCode.match(/document\.write\([^)]+\)/g)?.[0] || '',
+              location: 'Custom Code',
+              remediation: 'Use DOM manipulation methods like appendChild or innerText instead.'
+            });
+          }
+          if (customCode.includes('innerHTML')) {
+            issues.push({
+              severity: SEVERITY.High,
+              title: 'Use of innerHTML Detected',
+              description: 'Unescaped innerHTML can lead to XSS if user input is involved.',
+              snippet: customCode.match(/\.innerHTML\s*=\s*[^;]+/g)?.[0] || '',
+              location: 'Custom Code',
+              remediation: 'Use textContent or sanitize inputs with a library like DOMPurify.'
+            });
+          }
+
+          // Dynamic script/element creation
+          if (customCode.includes('createElement("script")') || customCode.includes('createElement("iframe")')) {
+            issues.push({
+              severity: SEVERITY.Medium,
+              title: 'Dynamic Script/Iframe Creation Detected',
+              description: 'Dynamically created scripts or iframes from untrusted sources can introduce vulnerabilities.',
+              snippet: customCode.match(/createElement\(['"]script['"]\)|createElement\(['"]iframe['"]\)/g)?.[0] || '',
+              location: 'Custom Code',
+              remediation: 'Validate and sanitize source URLs or avoid dynamic element creation.'
+            });
+          }
+
+          // URL manipulation risks
+          if (customCode.includes('window.location')) {
+            issues.push({
+              severity: SEVERITY.Medium,
+              title: 'URL Manipulation Detected',
+              description: 'Unvalidated window.location changes can lead to open redirects.',
+              snippet: customCode.match(/window\.location\s*=\s*[^;]+/g)?.[0] || '',
+              location: 'Custom Code',
+              remediation: 'Validate URLs before redirection and use trusted domains.'
+            });
+          }
+
+          // Obfuscated code detection (basic check for base64)
+          if (customCode.includes('atob(') || customCode.match(/base64/)) {
+            issues.push({
+              severity: SEVERITY.Medium,
+              title: 'Potential Obfuscated Code Detected',
+              description: 'Base64 or obfuscated code may hide malicious intent.',
+              snippet: customCode.match(/atob\([^)]+\)|base64/g)?.[0] || '',
+              location: 'Custom Code',
+              remediation: 'Review and decode obfuscated code to ensure it’s safe.'
+            });
+          }
+
+          // Inline event handler scrutiny
+          const eventHandlers = customCode.match(/on(click|mouseover|keydown|submit)\s*=\s*['"][^'"]+['"]/g);
+          if (eventHandlers) {
+            issues.push({
+              severity: SEVERITY.Low,
+              title: 'Inline Event Handlers Detected',
+              description: 'Inline event handlers (e.g., onclick) can be prone to injection if dynamic.',
+              snippet: eventHandlers[0],
+              location: 'Custom Code',
+              remediation: 'Move event handlers to external JavaScript with addEventListener.'
+            });
+          }
+        }
+
+        displayResults(issues, 'custom code');
+      } catch (error) {
+        console.error('Error analyzing custom code:', error);
+        resultsDiv.innerHTML = '<p class="text-red-600">Error analyzing custom code. Please try again.</p>';
+      } finally {
+        progressDiv.classList.add('hidden');
+      }
+    }
+
+    // External Resource Audit
+    async function auditExternalResources() {
+      const resultsDiv = document.getElementById('resultsContent');
+      const progressDiv = document.getElementById('progress');
+      progressDiv.classList.remove('hidden');
+      progressDiv.textContent = 'Auditing external resources...';
+      issues = [];
+
+      try {
+        const pages = await webflow.getAllPages();
+        const resources = [];
+
+        // Extract URLs from pages
+        pages.forEach(page => {
+          const elements = page.elements || [];
+          elements.forEach(el => {
+            if (el.src && (el.type === 'script' || el.type === 'link' || el.type === 'img' || el.type === 'iframe')) {
+              resources.push({
+                url: el.src,
+                type: el.type.charAt(0).toUpperCase() + el.type.slice(1),
+                page: page.name
+              });
+            }
+          });
+        });
+
+        // Analyze resources
+        resources.forEach(resource => {
+          const domain = new URL(resource.url).hostname;
+          let safety = 'Unknown';
+          if (trustedDomains.includes(domain)) {
+            safety = 'Trusted';
+          } else if (maliciousDomains.includes(domain)) {
+            safety = 'Malicious';
+          }
+
+          issues.push({
+            severity: safety === 'Malicious' ? SEVERITY.High : SEVERITY.Informational,
+            title: `External ${resource.type}: ${domain}`,
+            description: `Found ${resource.type.toLowerCase()} from ${resource.url}. Safety: ${safety}.`,
+            location: `Page: ${resource.page}`,
+            remediation: safety === 'Malicious' ? 'Remove or replace with a trusted source.' : 'Verify the source’s legitimacy.'
+          });
+
+          // Check for Subresource Integrity (SRI)
+          if ((resource.type === 'Script' || resource.type === 'Link') && !resource.integrity) {
+            issues.push({
+              severity: SEVERITY.Medium,
+              title: `Missing SRI for ${resource.type}`,
+              description: `Subresource Integrity (SRI) is not defined for ${resource.url}.`,
+              location: `Page: ${resource.page}`,
+              remediation: 'Add an integrity attribute with a hash (e.g., sha256) to ensure resource integrity.'
+            });
+          }
+        });
+
+        // Optional: Fetch dynamic domain lists from backend
+        /*
+        try {
+          const response = await fetch('https://your-backend-api/domain-lists', {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+          });
+          const { trusted, malicious } = await response.json();
+          trustedDomains.push(...trusted);
+          maliciousDomains.push(...malicious);
+        } catch (error) {
+          console.error('Error fetching domain lists:', error);
+        }
+        */
+
+        displayResults(issues, 'external resource');
+      } catch (error) {
+        console.error('Error auditing resources:', error);
+        resultsDiv.innerHTML = '<p class="text-red-600">Error auditing resources. Please try again.</p>';
+      } finally {
+        progressDiv.classList.add('hidden');
+      }
+    }
+
+    // Security Header Recommendations
+    async function recommendSecurityHeaders() {
+      const resultsDiv = document.getElementById('resultsContent');
+      const progressDiv = document.getElementById('progress');
+      progressDiv.classList.remove('hidden');
+      progressDiv.textContent = 'Generating security header recommendations...';
+      issues = [];
+
+      // Header recommendations with educational content
+      const headers = [
+        {
+          severity: SEVERITY.Informational,
+          title: 'Content-Security-Policy (CSP)',
+          description: 'Restricts resources the browser can load, reducing XSS risks.',
+          remediation: 'Implement via meta tag (limited) or request Webflow to add: <meta http-equiv="Content-Security-Policy" content="default-src \'self\'">.',
+          location: 'Site-wide (HTTP Header)'
+        },
+        {
+          severity: SEVERITY.Informational,
+          title: 'X-Frame-Options',
+          description: 'Prevents clickjacking by controlling iframe embedding.',
+          remediation: 'Request Webflow to set: X-Frame-Options: DENY.',
+          location: 'Site-wide (HTTP Header)'
+        },
+        {
+          severity: SEVERITY.Informational,
+          title: 'Strict-Transport-Security (HSTS)',
+          description: 'Enforces HTTPS, protecting against man-in-the-middle attacks.',
+          remediation: 'Request Webflow to set: Strict-Transport-Security: max-age=31536000; includeSubDomains.',
+          location: 'Site-wide (HTTP Header)'
+        },
+        {
+          severity: SEVERITY.Informational,
+          title: 'X-Content-Type-Options',
+          description: 'Prevents MIME-type sniffing, reducing risks from misinterpreted files.',
+          remediation: 'Request Webflow to set: X-Content-Type-Options: nosniff.',
+          location: 'Site-wide (HTTP Header)'
+        },
+        {
+          severity: SEVERITY.Informational,
+          title: 'Referrer-Policy',
+          description: 'Controls referrer information sent with requests.',
+          remediation: 'Use meta tag: <meta name="referrer" content="strict-origin-when-cross-origin"> or request header.',
+          location: 'Site-wide (HTTP Header or Meta)'
+        },
+        {
+          severity: SEVERITY.Informational,
+          title: 'Permissions-Policy',
+          description: 'Controls browser features like geolocation or camera access.',
+          remediation: 'Use meta tag or header: Permissions-Policy: geolocation=(), camera=().',
+          location: 'Site-wide (HTTP Header or Meta)'
+        }
+      ];
+
+      // Optional: Fetch contextual advice from backend
+      /*
+      try {
+        const response = await fetch('https://your-backend-api/header-rules', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const customHeaders = await response.json();
+        headers.push(...customHeaders);
+      } catch (error) {
+        console.error('Error fetching header rules:', error);
+      }
+      */
+
+      issues = headers;
+      displayResults(issues, 'security header');
+      progressDiv.classList.add('hidden');
+    }
+
+    // Run Full Scan
+    async function runFullScan() {
+      issues = [];
+      await analyzeCustomCode();
+      issues = [...issues];
+      await auditExternalResources();
+      issues = [...issues];
+      await recommendSecurityHeaders();
+      issues = [...issues];
+      displayResults(issues, 'full scan');
+    }
+
+    // Tab Navigation
+    function setupTabs() {
+      const tabs = document.querySelectorAll('.tab-btn');
+      tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          tabs.forEach(t => {
+            t.classList.remove('text-blue-600', 'border-blue-600');
+            t.classList.add('text-gray-600');
+          });
+          tab.classList.add('text-blue-600', 'border-blue-600');
+          
+          if (tab.id === 'tabCode') analyzeCustomCode();
+          else if (tab.id === 'tabResources') auditExternalResources();
+          else if (tab.id === 'tabHeaders') recommendSecurityHeaders();
+        });
+      });
+    }
+
+    // Event Listeners
+    document.getElementById('runScanBtn').addEventListener('click', runFullScan);
+    document.getElementById('severityFilter').addEventListener('change', () => displayResults(issues, 'filtered'));
+    document.getElementById('sortIssuesBtn').addEventListener('click', () => {
+      document.getElementById('sortIssuesBtn').dataset.sorted = 'true';
+      displayResults(issues, 'sorted');
+    });
+
+    // Real-time Scanning (basic event listener for code changes, if SDK supports)
+    /*
+    webflow.on('customCodeChanged', () => {
+      analyzeCustomCode(); // Trigger on code change (if SDK supports)
+    });
+    */
+
+    // Initialize App
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!webflow) {
+        document.getElementById('resultsContent').innerHTML = 
+          '<p class="text-red-600">Webflow Apps SDK not loaded. Ensure the app is running in the Webflow Designer.</p>';
+        return;
+      }
+      setupTabs();
+      // Default to Custom Code tab
+      document.getElementById('tabCode').click();
+    });
+  </script>
+</body>
+</html>
