@@ -14,3 +14,5 @@ A Webflow Designer Extension to audit custom code, external resources, and manag
 - **Improved Visibility**: Removed scrollbars and dynamically resized iframe to fit content.
 - ## Vim Troubleshooting
 - **Swap File Error**: Kill the running Vim process (e.g., `kill -9 44629`), delete the swap file (`rm .git/.COMMIT_EDITMSG.swp`), and resume the commit.
+- ## Updates
+- **Real-Time Monitoring**: Added background vulnerability monitoring with notifications for new issues.
