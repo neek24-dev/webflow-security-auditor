@@ -44,7 +44,6 @@
       flex-wrap: wrap;
       gap: 0.5rem;
     }
-    /* Notification badge */
     .badge {
       display: inline-block;
       background-color: #ef4444;
@@ -54,7 +53,6 @@
       font-size: 0.75rem;
       margin-left: 0.5rem;
     }
-    /* Toast notification */
     #toast {
       position: fixed;
       bottom: 1rem;
@@ -92,6 +90,9 @@
         <button id="injectHeadersBtn" class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">
           Inject Security Headers
         </button>
+        <button id="injectAllHeadersBtn" class="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded">
+          Inject All Recommended Headers
+        </button>
         <select id="severityFilter" class="border rounded px-2 py-1">
           <option value="all">All Severities</option>
           <option value="High">High</option>
@@ -102,7 +103,6 @@
         <button id="sortIssuesBtn" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
           Sort by Severity
         </button>
-        <!-- Monitoring Toggle -->
         <button id="monitorToggleBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
           Enable Monitoring
         </button>
@@ -127,14 +127,10 @@
   </div>
 
   <script>
-    // Initialize Webflow Apps SDK
     const webflow = window.WebflowApps;
-
-    // Mock trusted/malicious domains
     const trustedDomains = ['cdn.jsdelivr.net', 'unpkg.com'];
     const maliciousDomains = ['example-malicious.com'];
 
-    // Severity levels
     const SEVERITY = {
       High: 'High (Critical: Immediate action required)',
       Medium: 'Medium (Important: Address soon)',
@@ -142,13 +138,12 @@
       Informational: 'Informational (Best practice)'
     };
 
-    // Store issues for filtering/sorting and monitoring
     let issues = [];
     let lastScanResults = { customCode: [], resources: [], headers: [] };
     let isMonitoring = false;
     let monitoringInterval;
+    let recommendedHeaders = [];
 
-    // Function to resize iframe
     function resizeIframe() {
       if (webflow && webflow.resize) {
         const body = document.body;
@@ -176,7 +171,6 @@
       }
     }
 
-    // Debounce resize
     function debounce(func, wait) {
       let timeout;
       return function (...args) {
@@ -187,7 +181,6 @@
 
     const debouncedResizeIframe = debounce(resizeIframe, 100);
 
-    // Show toast notification
     function showToast(message, changes) {
       const toast = document.getElementById('toast');
       const toastMessage = document.getElementById('toastMessage');
@@ -202,7 +195,6 @@
       }, 5000);
     }
 
-    // Display changes in results
     function displayChanges(changes) {
       const resultsDiv = document.getElementById('resultsContent');
       resultsDiv.innerHTML = `
@@ -219,7 +211,6 @@
       debouncedResizeIframe();
     }
 
-    // Update badge on tabs
     function updateBadge(tabId, count) {
       const badge = document.getElementById(`${tabId}Badge`);
       if (count > 0) {
@@ -230,7 +221,6 @@
       }
     }
 
-    // Compare scan results to detect changes
     function detectChanges(newResults, section) {
       const lastResults = lastScanResults[section];
       const newIssues = newResults.filter(newIssue => 
@@ -255,7 +245,6 @@
       return { newIssues, resolvedIssues, changes };
     }
 
-    // Background monitoring
     async function monitorVulnerabilities() {
       if (!isMonitoring) return;
 
@@ -263,7 +252,6 @@
       let resourcesIssues = [];
       let headersIssues = [];
 
-      // Re-run scans
       try {
         const siteData = await webflow.getSiteCustomCode();
         const pages = await webflow.getAllPages();
@@ -332,7 +320,7 @@
 
         const implementedHeaders = await detectImplementedHeaders();
         const headers = [
-          { name: 'Content-Security-Policy', severity: SEVERITY.Informational, description: 'Restricts resources the browser can load, reducing XSS risks.', remediation: 'Add via meta tag or request Webflow to set header.', location: 'Site-wide (HTTP Header or Meta)' },
+          { name: 'Content-Security-Policy', severity: SEVERITY.Informational, description: 'Restricts resources the browser can load, reducing XSS risks.', remediation: 'Add via meta tag: <meta http-equiv="Content-Security-Policy" content="default-src \'self\'; script-src \'self\' https://cdn.jsdelivr.net https://unpkg.com; style-src \'self\' https://cdn.tailwindcss.com; img-src \'self\' data:; frame-src \'none\';"> or request Webflow to set header.', location: 'Site-wide (HTTP Header or Meta)' },
           { name: 'X-Frame-Options', severity: SEVERITY.Informational, description: 'Prevents clickjacking by controlling iframe embedding.', remediation: 'Request Webflow to set: X-Frame-Options: DENY.', location: 'Site-wide (HTTP Header)' }
         ];
         headers.forEach(header => {
@@ -347,17 +335,14 @@
           });
         });
 
-        // Detect changes
         const codeChanges = detectChanges(customCodeIssues, 'customCode');
         const resourcesChanges = detectChanges(resourcesIssues, 'resources');
         const headersChanges = detectChanges(headersIssues, 'headers');
 
-        // Update badges
         updateBadge('code', codeChanges.newIssues.length);
         updateBadge('resources', resourcesChanges.newIssues.length);
         updateBadge('headers', headersChanges.newIssues.length);
 
-        // Show toast if new issues are found
         const totalNewIssues = codeChanges.newIssues.length + resourcesChanges.newIssues.length + headersChanges.newIssues.length;
         if (totalNewIssues > 0) {
           const allChanges = [
@@ -372,7 +357,6 @@
       }
     }
 
-    // Toggle monitoring
     function toggleMonitoring() {
       const toggleBtn = document.getElementById('monitorToggleBtn');
       isMonitoring = !isMonitoring;
@@ -380,18 +364,16 @@
       toggleBtn.classList.toggle('bg-blue-500', !isMonitoring);
       toggleBtn.classList.toggle('bg-red-500', isMonitoring);
       if (isMonitoring) {
-        monitoringInterval = setInterval(monitorVulnerabilities, 60000); // Scan every 60 seconds
-        monitorVulnerabilities(); // Run immediately
+        monitoringInterval = setInterval(monitorVulnerabilities, 60000);
+        monitorVulnerabilities();
       } else {
         clearInterval(monitoringInterval);
-        // Reset badges
         updateBadge('code', 0);
         updateBadge('resources', 0);
         updateBadge('headers', 0);
       }
     }
 
-    // Display results
     function displayResults(results, type) {
       const resultsDiv = document.getElementById('resultsContent');
       const filter = document.getElementById('severityFilter').value;
@@ -423,7 +405,6 @@
       debouncedResizeIframe();
     }
 
-    // Custom Code Analysis
     async function analyzeCustomCode() {
       const resultsDiv = document.getElementById('resultsContent');
       const progressDiv = document.getElementById('progress');
@@ -534,7 +515,6 @@
       }
     }
 
-    // External Resource Audit
     async function auditExternalResources() {
       const resultsDiv = document.getElementById('resultsContent');
       const progressDiv = document.getElementById('progress');
@@ -597,7 +577,6 @@
       }
     }
 
-    // Inject Security Headers
     async function injectSecurityHeaders() {
       const resultsDiv = document.getElementById('resultsContent');
       const progressDiv = document.getElementById('progress');
@@ -637,7 +616,69 @@
       debouncedResizeIframe();
     }
 
-    // Detect Implemented Headers
+    async function injectAllRecommendedHeaders() {
+      const resultsDiv = document.getElementById('resultsContent');
+      const progressDiv = document.getElementById('progress');
+      progressDiv.classList.remove('hidden');
+      progressDiv.textContent = 'Attempting to inject all recommended headers...';
+
+      try {
+        // Headers that can be injected via meta tags
+        const injectableHeaders = `
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.tailwindcss.com; img-src 'self' data:; frame-src 'none';">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="Permissions-Policy" content="geolocation=(), camera=()">
+        `;
+
+        // Instructions for headers that must be set by Webflow
+        const manualHeaders = `
+For the following headers, request Webflow to set them in the site settings:
+- X-Frame-Options: DENY
+- Strict-Transport-Security: max-age=31536000; includeSubDomains
+- X-Content-Type-Options: nosniff
+        `;
+
+        if (webflow.setCustomCode) {
+          await webflow.setCustomCode({
+            head: injectableHeaders
+          });
+          resultsDiv.innerHTML = `
+            <p class="text-green-600">Successfully injected meta tag headers (Content-Security-Policy, Referrer-Policy, Permissions-Policy).</p>
+            <p class="text-yellow-600">Some headers cannot be set via meta tags. Please follow the instructions below:</p>
+            <pre class="bg-gray-100 p-2 rounded">${manualHeaders}</pre>
+            <button id="copyManualHeadersBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-2">Copy Instructions</button>
+          `;
+          document.getElementById('copyManualHeadersBtn')?.addEventListener('click', () => {
+            navigator.clipboard.writeText(manualHeaders);
+            alert('Instructions copied to clipboard!');
+          });
+        } else {
+          const allInstructions = `
+Add the following to Webflow's Custom Code (Head) section:
+${injectableHeaders}
+
+${manualHeaders}
+          `;
+          resultsDiv.innerHTML = `
+            <p class="text-yellow-600">Automatic injection not supported by SDK. Copy the instructions below to add headers manually:</p>
+            <pre class="bg-gray-100 p-2 rounded">${allInstructions}</pre>
+            <button id="copyAllHeadersBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-2">Copy All Instructions</button>
+          `;
+          document.getElementById('copyAllHeadersBtn')?.addEventListener('click', () => {
+            navigator.clipboard.writeText(allInstructions);
+            alert('Instructions copied to clipboard!');
+          });
+        }
+      } catch (error) {
+        console.error('Error injecting all headers:', error);
+        resultsDiv.innerHTML = '<p class="text-red-600">Error injecting headers. Please add manually or contact Webflow Support.</p>';
+      } finally {
+        progressDiv.classList.add('hidden');
+      }
+
+      debouncedResizeIframe();
+    }
+
     async function detectImplementedHeaders() {
       const implemented = [];
       const metaCSP = document.querySelector('meta[http-equiv="Content-Security-Policy"]');
@@ -669,7 +710,6 @@
       return implemented;
     }
 
-    // Security Header Recommendations
     async function recommendSecurityHeaders() {
       const resultsDiv = document.getElementById('resultsContent');
       const progressDiv = document.getElementById('progress');
@@ -725,14 +765,16 @@
 
       headers.forEach(header => {
         const implemented = implementedHeaders.find(h => h.name === header.name);
-        issues.push({
+        const issue = {
           severity: header.severity,
           title: header.name,
           description: header.description,
           location: header.location,
           status: implemented ? `Implemented (${implemented.type}: ${implemented.value})` : 'Not implemented',
           remediation: implemented ? 'No further action needed.' : header.remediation
-        });
+        };
+        issues.push(issue);
+        if (!implemented) recommendedHeaders.push(issue);
       });
 
       lastScanResults.headers = [...issues];
@@ -740,7 +782,6 @@
       progressDiv.classList.add('hidden');
     }
 
-    // Run Full Scan
     async function runFullScan() {
       issues = [];
       await analyzeCustomCode();
@@ -750,9 +791,9 @@
       await recommendSecurityHeaders();
       issues = [...issues];
       displayResults(issues, 'full scan');
+      document.getElementById('tabHeaders').click(); // Switch to Headers tab to show results
     }
 
-    // Tab Navigation
     function setupTabs() {
       const tabs = document.querySelectorAll('.tab-btn');
       tabs.forEach(tab => {
@@ -770,7 +811,6 @@
       });
     }
 
-    // Set up ResizeObserver
     function setupResizeObserver() {
       const resultsDiv = document.getElementById('results');
       const observer = new ResizeObserver(() => {
@@ -780,7 +820,6 @@
       observer.observe(document.body);
     }
 
-    // Set up MutationObserver
     function setupMutationObserver() {
       const targetNode = document.getElementById('resultsContent');
       const config = { childList: true, subtree: true, characterData: true };
@@ -791,9 +830,9 @@
       observer.observe(targetNode, config);
     }
 
-    // Event Listeners
     document.getElementById('runScanBtn').addEventListener('click', runFullScan);
     document.getElementById('injectHeadersBtn').addEventListener('click', injectSecurityHeaders);
+    document.getElementById('injectAllHeadersBtn').addEventListener('click', injectAllRecommendedHeaders);
     document.getElementById('severityFilter').addEventListener('click', () => displayResults(issues, 'filtered'));
     document.getElementById('sortIssuesBtn').addEventListener('click', () => {
       document.getElementById('sortIssuesBtn').dataset.sorted = 'true';
@@ -802,7 +841,6 @@
     document.getElementById('monitorToggleBtn').addEventListener('click', toggleMonitoring);
     window.addEventListener('resize', debouncedResizeIframe);
 
-    // Initialize App
     document.addEventListener('DOMContentLoaded', () => {
       if (!webflow) {
         document.getElementById('resultsContent').innerHTML = 
