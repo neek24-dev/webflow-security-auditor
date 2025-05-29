@@ -10,3 +10,5 @@ A Webflow Designer Extension to audit custom code, external resources, and manag
 2. Update `index.html` with your Netlify URL for function calls.
 3. Register the app in Webflow with the Netlify URL.
 4. Upload the ZIP bundle in Webflow App Development.
+## Updates
+- **Improved Visibility**: Removed scrollbars and dynamically resized iframe to fit content.
