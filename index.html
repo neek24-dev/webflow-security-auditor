@@ -64,7 +64,6 @@
       display: none;
       z-index: 50;
     }
-    /* Custom styles for header boxes */
     .injectable-box {
       border: 2px solid #10b981;
       background-color: #ecfdf5;
@@ -85,7 +84,6 @@
   <div class="container mx-auto p-4 flex flex-col">
     <h1 class="text-2xl font-bold mb-4">Webflow Security Auditor</h1>
     <div class="flex flex-col space-y-4">
-      <!-- Navigation Tabs -->
       <div class="flex space-x-2 border-b">
         <button id="tabCode" class="tab-btn px-4 py-2 font-semibold text-blue-600 border-b-2 border-blue-600">
           Custom Code <span id="codeBadge" class="badge hidden"></span>
@@ -97,7 +95,6 @@
           Security Headers <span id="headersBadge" class="badge hidden"></span>
         </button>
       </div>
-      <!-- Scan Controls -->
       <div class="flex space-x-2">
         <button id="runScanBtn" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
           Run Full Scan
@@ -122,20 +119,16 @@
           Enable Monitoring
         </button>
       </div>
-      <!-- Progress Indicator -->
       <div id="progress" class="hidden text-blue-600 font-semibold"></div>
-      <!-- Results Display -->
       <div id="results" class="bg-white p-4 rounded shadow">
         <h2 class="text-xl font-semibold mb-2">Security Audit Results</h2>
         <div id="resultsContent" class="text-gray-700"></div>
       </div>
-      <!-- Contextual Help -->
       <div class="text-sm text-gray-600">
         <p>Need help? <a href="https://owasp.org/www-project-top-ten/" target="_blank" class="text-blue-600 underline">Learn about web security</a> or <a href="https://webflow.com/docs" target="_blank" class="text-blue-600 underline">Webflow documentation</a>.</p>
       </div>
     </div>
   </div>
-  <!-- Toast Notification -->
   <div id="toast">
     <p id="toastMessage"></p>
     <button id="viewChangesBtn" class="underline text-blue-300">View Changes</button>
@@ -272,7 +265,7 @@
         const pages = await webflow.getAllPages();
         let customCode = (siteData?.head || '') + (siteData?.footer || '');
         pages.forEach(page => {
-          if (page.customEmbeds) customCode += page.customEmbeds.join('');
+          if (page.customEmbeds) customCode += page.customRedactedEmbeds.join('');
         });
 
         if (!customCode) {
@@ -700,7 +693,30 @@ ${manualHeaders}
         }
       } catch (error) {
         console.error('Error injecting all headers:', error);
-        resultsDiv.innerHTML = '<p class="text-red-600">Error injecting headers. Please add manually or contact Webflow Support.</p>';
+        const allInstructions = `
+Add the following to Webflow's Custom Code (Head) section:
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.tailwindcss.com; img-src 'self' data:; frame-src 'none';">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="Permissions-Policy" content="geolocation=(), camera=()">
+
+For the following headers, request Webflow to set them in the site settings:
+- X-Frame-Options: DENY
+- Strict-Transport-Security: max-age=31536000; includeSubDomains
+- X-Content-Type-Options: nosniff
+Contact Webflow Support for assistance: https://university.webflow.com/support
+        `;
+        resultsDiv.innerHTML = `
+          <div class="non-injectable-box">
+            <h3 class="text-lg font-semibold text-yellow-700 mb-2">Error Injecting Headers</h3>
+            <p class="text-yellow-600 mb-2">Error injecting headers. Copy the instructions below to add headers manually:</p>
+            <pre class="bg-white p-2 rounded border border-yellow-300">${allInstructions}</pre>
+            <button id="copyErrorHeadersBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-2">Copy Instructions</button>
+          </div>
+        `;
+        document.getElementById('copyErrorHeadersBtn')?.addEventListener('click', () => {
+          navigator.clipboard.writeText(allInstructions);
+          alert('Instructions copied to clipboard!');
+        });
       } finally {
         progressDiv.classList.add('hidden');
       }
