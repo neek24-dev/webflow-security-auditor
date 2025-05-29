@@ -9,24 +9,21 @@
   <!-- Webflow Apps SDK (assumed injected by Webflow) -->
   <script src="https://sdk.webflow.com/js/webflow-apps.js"></script>
   <style>
-    /* Enable scrollbars on body/html when content overflows */
     html, body {
       margin: 0;
       padding: 0;
       overflow: auto;
       height: auto;
-      width: 600px; /* Fixed width to match iframe */
+      width: 600px;
       box-sizing: border-box;
     }
-    /* Enable scrollbars on results div */
     #results {
       overflow: auto !important;
       height: auto !important;
       width: 100% !important;
       flex: none !important;
-      max-width: 600px; /* Ensure content fits within iframe width */
+      max-width: 600px;
     }
-    /* Ensure container respects the fixed width */
     .container {
       min-height: auto;
       height: auto;
@@ -34,34 +31,58 @@
       max-width: 600px;
       box-sizing: border-box;
     }
-    /* Make content responsive within the fixed width */
     .container > div {
       width: 100%;
       max-width: 100%;
     }
-    /* Ensure child elements don't overflow */
     .container * {
       box-sizing: border-box;
       max-width: 100%;
       word-wrap: break-word;
     }
-    /* Adjust buttons and inputs for smaller widths */
     .flex.space-x-2 {
       flex-wrap: wrap;
       gap: 0.5rem;
+    }
+    /* Notification badge */
+    .badge {
+      display: inline-block;
+      background-color: #ef4444;
+      color: white;
+      border-radius: 9999px;
+      padding: 0.2rem 0.5rem;
+      font-size: 0.75rem;
+      margin-left: 0.5rem;
+    }
+    /* Toast notification */
+    #toast {
+      position: fixed;
+      bottom: 1rem;
+      right: 1rem;
+      background-color: #1f2937;
+      color: white;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      display: none;
+      z-index: 50;
     }
   </style>
 </head>
 <body class="bg-gray-100 font-sans">
   <div class="container mx-auto p-4 flex flex-col">
-    <!-- Dashboard Header -->
     <h1 class="text-2xl font-bold mb-4">Webflow Security Auditor</h1>
     <div class="flex flex-col space-y-4">
       <!-- Navigation Tabs -->
       <div class="flex space-x-2 border-b">
-        <button id="tabCode" class="tab-btn px-4 py-2 font-semibold text-blue-600 border-b-2 border-blue-600">Custom Code</button>
-        <button id="tabResources" class="tab-btn px-4 py-2 font-semibold text-gray-600">External Resources</button>
-        <button id="tabHeaders" class="tab-btn px-4 py-2 font-semibold text-gray-600">Security Headers</button>
+        <button id="tabCode" class="tab-btn px-4 py-2 font-semibold text-blue-600 border-b-2 border-blue-600">
+          Custom Code <span id="codeBadge" class="badge hidden"></span>
+        </button>
+        <button id="tabResources" class="tab-btn px-4 py-2 font-semibold text-gray-600">
+          External Resources <span id="resourcesBadge" class="badge hidden"></span>
+        </button>
+        <button id="tabHeaders" class="tab-btn px-4 py-2 font-semibold text-gray-600">
+          Security Headers <span id="headersBadge" class="badge hidden"></span>
+        </button>
       </div>
       <!-- Scan Controls -->
       <div class="flex space-x-2">
@@ -81,6 +102,10 @@
         <button id="sortIssuesBtn" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
           Sort by Severity
         </button>
+        <!-- Monitoring Toggle -->
+        <button id="monitorToggleBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+          Enable Monitoring
+        </button>
       </div>
       <!-- Progress Indicator -->
       <div id="progress" class="hidden text-blue-600 font-semibold"></div>
@@ -95,12 +120,17 @@
       </div>
     </div>
   </div>
+  <!-- Toast Notification -->
+  <div id="toast">
+    <p id="toastMessage"></p>
+    <button id="viewChangesBtn" class="underline text-blue-300">View Changes</button>
+  </div>
 
   <script>
     // Initialize Webflow Apps SDK
     const webflow = window.WebflowApps;
 
-    // Mock trusted/malicious domains (replace with backend API in production)
+    // Mock trusted/malicious domains
     const trustedDomains = ['cdn.jsdelivr.net', 'unpkg.com'];
     const maliciousDomains = ['example-malicious.com'];
 
@@ -112,13 +142,15 @@
       Informational: 'Informational (Best practice)'
     };
 
-    // Store issues for filtering/sorting
+    // Store issues for filtering/sorting and monitoring
     let issues = [];
+    let lastScanResults = { customCode: [], resources: [], headers: [] };
+    let isMonitoring = false;
+    let monitoringInterval;
 
-    // Function to resize iframe with fixed width and dynamic height
+    // Function to resize iframe
     function resizeIframe() {
       if (webflow && webflow.resize) {
-        // Calculate height dynamically
         const body = document.body;
         const html = document.documentElement;
         const height = Math.max(
@@ -127,15 +159,13 @@
           html.clientHeight,
           html.scrollHeight,
           html.offsetHeight
-        ) + 20; // Add padding
-        const width = 600; // Fixed width as requested
-        // Attempt to resize
+        ) + 20;
+        const width = 600;
         try {
           webflow.resize({ height: height, width: width });
           console.log(`Resized iframe to height: ${height}px, width: ${width}px`);
         } catch (error) {
           console.error('Error resizing iframe:', error);
-          // Fallback: Display a message
           const resultsDiv = document.getElementById('resultsContent');
           if (!resultsDiv.innerHTML.includes('Iframe resizing not supported')) {
             resultsDiv.innerHTML += '<p class="text-yellow-600">Iframe resizing not supported by Webflow SDK. Use scrollbars to view content.</p>';
@@ -146,7 +176,7 @@
       }
     }
 
-    // Debounce resize to avoid excessive calls
+    // Debounce resize
     function debounce(func, wait) {
       let timeout;
       return function (...args) {
@@ -157,29 +187,211 @@
 
     const debouncedResizeIframe = debounce(resizeIframe, 100);
 
-    // Set up ResizeObserver to monitor content size changes
-    function setupResizeObserver() {
-      const resultsDiv = document.getElementById('results');
-      const observer = new ResizeObserver(() => {
-        debouncedResizeIframe();
-      });
-      // Observe the results div and the body for size changes
-      observer.observe(resultsDiv);
-      observer.observe(document.body);
-    }
-
-    // MutationObserver to detect DOM changes
-    function setupMutationObserver() {
-      const targetNode = document.getElementById('resultsContent');
-      const config = { childList: true, subtree: true, characterData: true };
-      const callback = () => {
-        debouncedResizeIframe();
+    // Show toast notification
+    function showToast(message, changes) {
+      const toast = document.getElementById('toast');
+      const toastMessage = document.getElementById('toastMessage');
+      toastMessage.textContent = message;
+      toast.style.display = 'block';
+      document.getElementById('viewChangesBtn').onclick = () => {
+        displayChanges(changes);
+        toast.style.display = 'none';
       };
-      const observer = new MutationObserver(callback);
-      observer.observe(targetNode, config);
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, 5000);
     }
 
-    // Display results with severity, snippets, and remediation
+    // Display changes in results
+    function displayChanges(changes) {
+      const resultsDiv = document.getElementById('resultsContent');
+      resultsDiv.innerHTML = `
+        <h3 class="text-lg font-semibold mb-2">Detected Changes</h3>
+        ${changes.map(change => `
+          <div class="mb-4 p-2 border-l-4 ${change.severity === 'High' ? 'border-red-600' : change.severity === 'Medium' ? 'border-yellow-600' : 'border-gray-400'}">
+            <p class="font-bold text-${change.severity === 'High' ? 'red' : change.severity === 'Medium' ? 'yellow' : 'gray'}-600">${change.severity}: ${change.title}</p>
+            <p>${change.description}</p>
+            <p><strong>Type:</strong> ${change.type}</p>
+            <p><strong>Status:</strong> ${change.status}</p>
+          </div>
+        `).join('')}
+      `;
+      debouncedResizeIframe();
+    }
+
+    // Update badge on tabs
+    function updateBadge(tabId, count) {
+      const badge = document.getElementById(`${tabId}Badge`);
+      if (count > 0) {
+        badge.textContent = count;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
+    // Compare scan results to detect changes
+    function detectChanges(newResults, section) {
+      const lastResults = lastScanResults[section];
+      const newIssues = newResults.filter(newIssue => 
+        !lastResults.some(oldIssue => 
+          oldIssue.title === newIssue.title && 
+          oldIssue.description === newIssue.description && 
+          oldIssue.location === newIssue.location
+        )
+      );
+      const resolvedIssues = lastResults.filter(oldIssue => 
+        !newResults.some(newIssue => 
+          newIssue.title === oldIssue.title && 
+          newIssue.description === oldIssue.description && 
+          newIssue.location === oldIssue.location
+        )
+      );
+      const changes = [
+        ...newIssues.map(issue => ({ ...issue, type: 'New Issue', status: 'Detected' })),
+        ...resolvedIssues.map(issue => ({ ...issue, type: 'Resolved Issue', status: 'No longer present' }))
+      ];
+      lastScanResults[section] = [...newResults];
+      return { newIssues, resolvedIssues, changes };
+    }
+
+    // Background monitoring
+    async function monitorVulnerabilities() {
+      if (!isMonitoring) return;
+
+      let customCodeIssues = [];
+      let resourcesIssues = [];
+      let headersIssues = [];
+
+      // Re-run scans
+      try {
+        const siteData = await webflow.getSiteCustomCode();
+        const pages = await webflow.getAllPages();
+        let customCode = (siteData?.head || '') + (siteData?.footer || '');
+        pages.forEach(page => {
+          if (page.customEmbeds) customCode += page.customEmbeds.join('');
+        });
+
+        if (!customCode) {
+          customCodeIssues.push({
+            severity: SEVERITY.Informational,
+            title: 'No Custom Code Found',
+            description: 'No custom code detected in head, footer, or page embeds.',
+            location: 'Site-wide',
+            remediation: 'No action needed.'
+          });
+        } else {
+          if (customCode.includes('eval(')) {
+            customCodeIssues.push({
+              severity: SEVERITY.High,
+              title: 'Use of eval() Detected',
+              description: 'The eval() function can execute arbitrary code, leading to XSS vulnerabilities.',
+              snippet: customCode.match(/eval\([^)]+\)/g)?.[0] || '',
+              location: 'Custom Code',
+              remediation: 'Replace eval() with safer alternatives like JSON.parse or structured data handling.'
+            });
+          }
+          if (customCode.includes('innerHTML')) {
+            customCodeIssues.push({
+              severity: SEVERITY.High,
+              title: 'Use of innerHTML Detected',
+              description: 'Unescaped innerHTML can lead to XSS if user input is involved.',
+              snippet: customCode.match(/\.innerHTML\s*=\s*[^;]+/g)?.[0] || '',
+              location: 'Custom Code',
+              remediation: 'Use textContent or sanitize inputs with a library like DOMPurify.'
+            });
+          }
+        }
+
+        const resources = [];
+        pages.forEach(page => {
+          const elements = page.elements || [];
+          elements.forEach(el => {
+            if (el.src && (el.type === 'script' || el.type === 'link' || el.type === 'img' || el.type === 'iframe')) {
+              resources.push({
+                url: el.src,
+                type: el.type.charAt(0).toUpperCase() + el.type.slice(1),
+                page: page.name
+              });
+            }
+          });
+        });
+        resources.forEach(resource => {
+          const domain = new URL(resource.url).hostname;
+          let safety = 'Unknown';
+          if (trustedDomains.includes(domain)) safety = 'Trusted';
+          else if (maliciousDomains.includes(domain)) safety = 'Malicious';
+          resourcesIssues.push({
+            severity: safety === 'Malicious' ? SEVERITY.High : SEVERITY.Informational,
+            title: `External ${resource.type}: ${domain}`,
+            description: `Found ${resource.type.toLowerCase()} from ${resource.url}. Safety: ${safety}.`,
+            location: `Page: ${resource.page}`,
+            remediation: safety === 'Malicious' ? 'Remove or replace with a trusted source.' : 'Verify the source’s legitimacy.'
+          });
+        });
+
+        const implementedHeaders = await detectImplementedHeaders();
+        const headers = [
+          { name: 'Content-Security-Policy', severity: SEVERITY.Informational, description: 'Restricts resources the browser can load, reducing XSS risks.', remediation: 'Add via meta tag or request Webflow to set header.', location: 'Site-wide (HTTP Header or Meta)' },
+          { name: 'X-Frame-Options', severity: SEVERITY.Informational, description: 'Prevents clickjacking by controlling iframe embedding.', remediation: 'Request Webflow to set: X-Frame-Options: DENY.', location: 'Site-wide (HTTP Header)' }
+        ];
+        headers.forEach(header => {
+          const implemented = implementedHeaders.find(h => h.name === header.name);
+          headersIssues.push({
+            severity: header.severity,
+            title: header.name,
+            description: header.description,
+            location: header.location,
+            status: implemented ? `Implemented (${implemented.type}: ${implemented.value})` : 'Not implemented',
+            remediation: implemented ? 'No further action needed.' : header.remediation
+          });
+        });
+
+        // Detect changes
+        const codeChanges = detectChanges(customCodeIssues, 'customCode');
+        const resourcesChanges = detectChanges(resourcesIssues, 'resources');
+        const headersChanges = detectChanges(headersIssues, 'headers');
+
+        // Update badges
+        updateBadge('code', codeChanges.newIssues.length);
+        updateBadge('resources', resourcesChanges.newIssues.length);
+        updateBadge('headers', headersChanges.newIssues.length);
+
+        // Show toast if new issues are found
+        const totalNewIssues = codeChanges.newIssues.length + resourcesChanges.newIssues.length + headersChanges.newIssues.length;
+        if (totalNewIssues > 0) {
+          const allChanges = [
+            ...codeChanges.changes,
+            ...resourcesChanges.changes,
+            ...headersChanges.changes
+          ];
+          showToast(`${totalNewIssues} new issue${totalNewIssues > 1 ? 's' : ''} detected!`, allChanges);
+        }
+      } catch (error) {
+        console.error('Error during monitoring:', error);
+      }
+    }
+
+    // Toggle monitoring
+    function toggleMonitoring() {
+      const toggleBtn = document.getElementById('monitorToggleBtn');
+      isMonitoring = !isMonitoring;
+      toggleBtn.textContent = isMonitoring ? 'Disable Monitoring' : 'Enable Monitoring';
+      toggleBtn.classList.toggle('bg-blue-500', !isMonitoring);
+      toggleBtn.classList.toggle('bg-red-500', isMonitoring);
+      if (isMonitoring) {
+        monitoringInterval = setInterval(monitorVulnerabilities, 60000); // Scan every 60 seconds
+        monitorVulnerabilities(); // Run immediately
+      } else {
+        clearInterval(monitoringInterval);
+        // Reset badges
+        updateBadge('code', 0);
+        updateBadge('resources', 0);
+        updateBadge('headers', 0);
+      }
+    }
+
+    // Display results
     function displayResults(results, type) {
       const resultsDiv = document.getElementById('resultsContent');
       const filter = document.getElementById('severityFilter').value;
@@ -208,7 +420,6 @@
         `).join('');
       }
 
-      // Resize iframe after content updates
       debouncedResizeIframe();
     }
 
@@ -313,6 +524,7 @@
           }
         }
 
+        lastScanResults.customCode = [...issues];
         displayResults(issues, 'custom code');
       } catch (error) {
         console.error('Error analyzing custom code:', error);
@@ -375,19 +587,7 @@
           }
         });
 
-        // Optional: Fetch dynamic domain lists from backend
-        try {
-          const response = await fetch('https://your-app-name.netlify.app/.netlify/functions/domain-lists', {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-          });
-          const { trusted, malicious } = await response.json();
-          trustedDomains.push(...trusted);
-          maliciousDomains.push(...malicious);
-        } catch (error) {
-          console.error('Error fetching domain lists:', error);
-        }
-
+        lastScanResults.resources = [...issues];
         displayResults(issues, 'external resource');
       } catch (error) {
         console.error('Error auditing resources:', error);
@@ -405,21 +605,18 @@
       progressDiv.textContent = 'Injecting security headers...';
 
       try {
-        // Meta tags to inject
         const headerCode = `
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.tailwindcss.com; img-src 'self' data:; frame-src 'none';">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="Permissions-Policy" content="geolocation=(), camera=()">
         `;
 
-        // Attempt to inject via SDK (assumed method; check Webflow SDK docs)
         if (webflow.setCustomCode) {
           await webflow.setCustomCode({
             head: headerCode
           });
           resultsDiv.innerHTML = '<p class="text-green-600">Security headers injected into site head code.</p>';
         } else {
-          // Fallback: Display code for manual insertion
           resultsDiv.innerHTML = `
             <p class="text-yellow-600">Automatic injection not supported by SDK. Copy the code below into Webflow's Custom Code (Head) section:</p>
             <pre class="bg-gray-100 p-2 rounded">${headerCode}</pre>
@@ -437,15 +634,12 @@
         progressDiv.classList.add('hidden');
       }
 
-      // Resize iframe after injection
       debouncedResizeIframe();
     }
 
     // Detect Implemented Headers
     async function detectImplementedHeaders() {
       const implemented = [];
-
-      // Client-side: Check meta tags in DOM
       const metaCSP = document.querySelector('meta[http-equiv="Content-Security-Policy"]');
       const metaReferrer = document.querySelector('meta[name="referrer"]');
       const metaPermissions = document.querySelector('meta[name="Permissions-Policy"]');
@@ -453,10 +647,9 @@
       if (metaReferrer) implemented.push({ name: 'Referrer-Policy', type: 'meta', value: metaReferrer.getAttribute('content') });
       if (metaPermissions) implemented.push({ name: 'Permissions-Policy', type: 'meta', value: metaPermissions.getAttribute('content') });
 
-      // Server-side: Check HTTP headers via Netlify Function
       try {
         const siteInfo = await webflow.getSiteInfo();
-        const domain = siteInfo.domain || siteInfo.publishedDomains?.[0]; // Get site domain
+        const domain = siteInfo.domain || siteInfo.publishedDomains?.[0];
         if (domain) {
           const response = await fetch('https://your-app-name.netlify.app/.netlify/functions/check-headers', {
             method: 'POST',
@@ -484,10 +677,7 @@
       progressDiv.textContent = 'Generating security header recommendations...';
       issues = [];
 
-      // Detect implemented headers
       const implementedHeaders = await detectImplementedHeaders();
-
-      // Define recommended headers
       const headers = [
         {
           name: 'Content-Security-Policy',
@@ -533,7 +723,6 @@
         }
       ];
 
-      // Update headers with implementation status
       headers.forEach(header => {
         const implemented = implementedHeaders.find(h => h.name === header.name);
         issues.push({
@@ -546,6 +735,7 @@
         });
       });
 
+      lastScanResults.headers = [...issues];
       displayResults(issues, 'security header');
       progressDiv.classList.add('hidden');
     }
@@ -580,6 +770,27 @@
       });
     }
 
+    // Set up ResizeObserver
+    function setupResizeObserver() {
+      const resultsDiv = document.getElementById('results');
+      const observer = new ResizeObserver(() => {
+        debouncedResizeIframe();
+      });
+      observer.observe(resultsDiv);
+      observer.observe(document.body);
+    }
+
+    // Set up MutationObserver
+    function setupMutationObserver() {
+      const targetNode = document.getElementById('resultsContent');
+      const config = { childList: true, subtree: true, characterData: true };
+      const callback = () => {
+        debouncedResizeIframe();
+      };
+      const observer = new MutationObserver(callback);
+      observer.observe(targetNode, config);
+    }
+
     // Event Listeners
     document.getElementById('runScanBtn').addEventListener('click', runFullScan);
     document.getElementById('injectHeadersBtn').addEventListener('click', injectSecurityHeaders);
@@ -588,8 +799,7 @@
       document.getElementById('sortIssuesBtn').dataset.sorted = 'true';
       displayResults(issues, 'sorted');
     });
-
-    // Resize on window resize or content change
+    document.getElementById('monitorToggleBtn').addEventListener('click', toggleMonitoring);
     window.addEventListener('resize', debouncedResizeIframe);
 
     // Initialize App
@@ -603,7 +813,6 @@
       setupResizeObserver();
       setupMutationObserver();
       document.getElementById('tabCode').click();
-      // Initial resize
       debouncedResizeIframe();
     });
   </script>
