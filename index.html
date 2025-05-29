@@ -9,31 +9,32 @@
   <!-- Webflow Apps SDK (assumed injected by Webflow) -->
   <script src="https://sdk.webflow.com/js/webflow-apps.js"></script>
   <style>
-    /* Ensure no scrollbars on body or html */
+    /* Enable scrollbars on body/html when content overflows */
     html, body {
       margin: 0;
       padding: 0;
-      overflow: hidden;
+      overflow: auto;
       height: auto;
-      width: auto;
+      width: 600px; /* Fixed width to match iframe */
       box-sizing: border-box;
     }
-    /* Remove scrollbar from results div and allow content to expand */
+    /* Enable scrollbars on results div */
     #results {
-      overflow: visible !important;
+      overflow: auto !important;
       height: auto !important;
-      width: auto !important;
+      width: 100% !important;
       flex: none !important;
+      max-width: 600px; /* Ensure content fits within iframe width */
     }
-    /* Ensure container adjusts to content */
+    /* Ensure container respects the fixed width */
     .container {
       min-height: auto;
       height: auto;
       width: 100%;
-      max-width: none;
+      max-width: 600px;
       box-sizing: border-box;
     }
-    /* Make content responsive */
+    /* Make content responsive within the fixed width */
     .container > div {
       width: 100%;
       max-width: 100%;
@@ -114,10 +115,10 @@
     // Store issues for filtering/sorting
     let issues = [];
 
-    // Function to resize iframe dynamically
+    // Function to resize iframe with fixed width and dynamic height
     function resizeIframe() {
       if (webflow && webflow.resize) {
-        // Calculate dimensions based on content
+        // Calculate height dynamically
         const body = document.body;
         const html = document.documentElement;
         const height = Math.max(
@@ -127,14 +128,8 @@
           html.scrollHeight,
           html.offsetHeight
         ) + 20; // Add padding
-        const width = Math.max(
-          body.scrollWidth,
-          body.offsetWidth,
-          html.clientWidth,
-          html.scrollWidth,
-          html.offsetWidth
-        ) + 20; // Add padding
-        // Attempt to resize both dimensions
+        const width = 600; // Fixed width as requested
+        // Attempt to resize
         try {
           webflow.resize({ height: height, width: width });
           console.log(`Resized iframe to height: ${height}px, width: ${width}px`);
@@ -143,7 +138,7 @@
           // Fallback: Display a message
           const resultsDiv = document.getElementById('resultsContent');
           if (!resultsDiv.innerHTML.includes('Iframe resizing not supported')) {
-            resultsDiv.innerHTML += '<p class="text-yellow-600">Iframe resizing not supported by Webflow SDK. Content may be clipped.</p>';
+            resultsDiv.innerHTML += '<p class="text-yellow-600">Iframe resizing not supported by Webflow SDK. Use scrollbars to view content.</p>';
           }
         }
       } else {
@@ -463,7 +458,7 @@
         const siteInfo = await webflow.getSiteInfo();
         const domain = siteInfo.domain || siteInfo.publishedDomains?.[0]; // Get site domain
         if (domain) {
-          const response = await fetch('https://webflow-security-auditor.netlify.app/.netlify/functions/check-headers', {
+          const response = await fetch('https://your-app-name.netlify.app/.netlify/functions/check-headers', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url: `https://${domain}` })
