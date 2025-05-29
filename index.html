@@ -25,6 +25,9 @@
         <button id="runScanBtn" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
           Run Full Scan
         </button>
+        <button id="injectHeadersBtn" class="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded">
+          Inject Security Headers
+        </button>
         <select id="severityFilter" class="border rounded px-2 py-1">
           <option value="all">All Severities</option>
           <option value="High">High</option>
@@ -56,7 +59,7 @@
 
     // Mock trusted/malicious domains (replace with backend API in production)
     const trustedDomains = ['cdn.jsdelivr.net', 'unpkg.com'];
-    const maliciousDomains = ['example-malicious.com']; // Replace with real data
+    const maliciousDomains = ['example-malicious.com'];
 
     // Severity levels
     const SEVERITY = {
@@ -94,12 +97,13 @@
           <p>${issue.description}</p>
           ${issue.snippet ? `<pre class="bg-gray-100 p-2 rounded">${issue.snippet}</pre>` : ''}
           <p><strong>Location:</strong> ${issue.location || 'N/A'}</p>
+          <p><strong>Status:</strong> ${issue.status || 'Not implemented'}</p>
           <p><strong>Remediation:</strong> ${issue.remediation}</p>
         </div>
       `).join('');
     }
 
-    // Custom Code Analysis
+    // Custom Code Analysis (unchanged)
     async function analyzeCustomCode() {
       const resultsDiv = document.getElementById('resultsContent');
       const progressDiv = document.getElementById('progress');
@@ -112,7 +116,6 @@
         const pages = await webflow.getAllPages();
         let customCode = (siteData?.head || '') + (siteData?.footer || '');
 
-        // Include page-specific embeds
         pages.forEach(page => {
           if (page.customEmbeds) {
             customCode += page.customEmbeds.join('');
@@ -128,7 +131,6 @@
             remediation: 'No action needed.'
           });
         } else {
-          // Dangerous function detection
           if (customCode.includes('eval(')) {
             issues.push({
               severity: SEVERITY.High,
@@ -159,8 +161,6 @@
               remediation: 'Use textContent or sanitize inputs with a library like DOMPurify.'
             });
           }
-
-          // Dynamic script/element creation
           if (customCode.includes('createElement("script")') || customCode.includes('createElement("iframe")')) {
             issues.push({
               severity: SEVERITY.Medium,
@@ -171,8 +171,6 @@
               remediation: 'Validate and sanitize source URLs or avoid dynamic element creation.'
             });
           }
-
-          // URL manipulation risks
           if (customCode.includes('window.location')) {
             issues.push({
               severity: SEVERITY.Medium,
@@ -183,8 +181,6 @@
               remediation: 'Validate URLs before redirection and use trusted domains.'
             });
           }
-
-          // Obfuscated code detection (basic check for base64)
           if (customCode.includes('atob(') || customCode.match(/base64/)) {
             issues.push({
               severity: SEVERITY.Medium,
@@ -195,8 +191,6 @@
               remediation: 'Review and decode obfuscated code to ensure it’s safe.'
             });
           }
-
-          // Inline event handler scrutiny
           const eventHandlers = customCode.match(/on(click|mouseover|keydown|submit)\s*=\s*['"][^'"]+['"]/g);
           if (eventHandlers) {
             issues.push({
@@ -219,7 +213,7 @@
       }
     }
 
-    // External Resource Audit
+    // External Resource Audit (unchanged)
     async function auditExternalResources() {
       const resultsDiv = document.getElementById('resultsContent');
       const progressDiv = document.getElementById('progress');
@@ -231,7 +225,6 @@
         const pages = await webflow.getAllPages();
         const resources = [];
 
-        // Extract URLs from pages
         pages.forEach(page => {
           const elements = page.elements || [];
           elements.forEach(el => {
@@ -245,7 +238,6 @@
           });
         });
 
-        // Analyze resources
         resources.forEach(resource => {
           const domain = new URL(resource.url).hostname;
           let safety = 'Unknown';
@@ -263,7 +255,6 @@
             remediation: safety === 'Malicious' ? 'Remove or replace with a trusted source.' : 'Verify the source’s legitimacy.'
           });
 
-          // Check for Subresource Integrity (SRI)
           if ((resource.type === 'Script' || resource.type === 'Link') && !resource.integrity) {
             issues.push({
               severity: SEVERITY.Medium,
@@ -276,9 +267,8 @@
         });
 
         // Optional: Fetch dynamic domain lists from backend
-        /*
         try {
-          const response = await fetch('https://your-backend-api/domain-lists', {
+          const response = await fetch('https://webflow-security-auditor.netlify.app/.netlify/functions/domain-lists', {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' },
           });
@@ -288,7 +278,6 @@
         } catch (error) {
           console.error('Error fetching domain lists:', error);
         }
-        */
 
         displayResults(issues, 'external resource');
       } catch (error) {
@@ -299,6 +288,82 @@
       }
     }
 
+    // Inject Security Headers
+    async function injectSecurityHeaders() {
+      const resultsDiv = document.getElementById('resultsContent');
+      const progressDiv = document.getElementById('progress');
+      progressDiv.classList.remove('hidden');
+      progressDiv.textContent = 'Injecting security headers...';
+
+      try {
+        // Meta tags to inject
+        const headerCode = `
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.tailwindcss.com; img-src 'self' data:; frame-src 'none';">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="Permissions-Policy" content="geolocation=(), camera=()">
+        `;
+
+        // Attempt to inject via SDK (assumed method; check Webflow SDK docs)
+        if (webflow.setCustomCode) {
+          await webflow.setCustomCode({
+            head: headerCode
+          });
+          resultsDiv.innerHTML = '<p class="text-green-600">Security headers injected into site head code.</p>';
+        } else {
+          // Fallback: Display code for manual insertion
+          resultsDiv.innerHTML = `
+            <p class="text-yellow-600">Automatic injection not supported by SDK. Copy the code below into Webflow's Custom Code (Head) section:</p>
+            <pre class="bg-gray-100 p-2 rounded">${headerCode}</pre>
+            <button id="copyCodeBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-2">Copy Code</button>
+          `;
+          document.getElementById('copyCodeBtn')?.addEventListener('click', () => {
+            navigator.clipboard.writeText(headerCode);
+            alert('Code copied to clipboard!');
+          });
+        }
+      } catch (error) {
+        console.error('Error injecting headers:', error);
+        resultsDiv.innerHTML = '<p class="text-red-600">Error injecting headers. Please add manually or contact Webflow Support.</p>';
+      } finally {
+        progressDiv.classList.add('hidden');
+      }
+    }
+
+    // Detect Implemented Headers
+    async function detectImplementedHeaders() {
+      const implemented = [];
+
+      // Client-side: Check meta tags in DOM
+      const metaCSP = document.querySelector('meta[http-equiv="Content-Security-Policy"]');
+      const metaReferrer = document.querySelector('meta[name="referrer"]');
+      const metaPermissions = document.querySelector('meta[name="Permissions-Policy"]');
+      if (metaCSP) implemented.push({ name: 'Content-Security-Policy', type: 'meta', value: metaCSP.getAttribute('content') });
+      if (metaReferrer) implemented.push({ name: 'Referrer-Policy', type: 'meta', value: metaReferrer.getAttribute('content') });
+      if (metaPermissions) implemented.push({ name: 'Permissions-Policy', type: 'meta', value: metaPermissions.getAttribute('content') });
+
+      // Server-side: Check HTTP headers via Netlify Function
+      try {
+        const siteInfo = await webflow.getSiteInfo();
+        const domain = siteInfo.domain || siteInfo.publishedDomains?.[0]; // Get site domain
+        if (domain) {
+          const response = await fetch('https://webflow-security-auditor.netlify.app/.netlify/functions/check-headers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: `https://${domain}` })
+          });
+          const headers = await response.json();
+          if (headers['content-security-policy']) implemented.push({ name: 'Content-Security-Policy', type: 'header', value: headers['content-security-policy'] });
+          if (headers['x-frame-options']) implemented.push({ name: 'X-Frame-Options', type: 'header', value: headers['x-frame-options'] });
+          if (headers['strict-transport-security']) implemented.push({ name: 'Strict-Transport-Security', type: 'header', value: headers['strict-transport-security'] });
+          if (headers['x-content-type-options']) implemented.push({ name: 'X-Content-Type-Options', type: 'header', value: headers['x-content-type-options'] });
+        }
+      } catch (error) {
+        console.error('Error checking server-side headers:', error);
+      }
+
+      return implemented;
+    }
+
     // Security Header Recommendations
     async function recommendSecurityHeaders() {
       const resultsDiv = document.getElementById('resultsContent');
@@ -307,67 +372,68 @@
       progressDiv.textContent = 'Generating security header recommendations...';
       issues = [];
 
-      // Header recommendations with educational content
+      // Detect implemented headers
+      const implementedHeaders = await detectImplementedHeaders();
+
+      // Define recommended headers
       const headers = [
         {
+          name: 'Content-Security-Policy',
           severity: SEVERITY.Informational,
-          title: 'Content-Security-Policy (CSP)',
           description: 'Restricts resources the browser can load, reducing XSS risks.',
-          remediation: 'Implement via meta tag (limited) or request Webflow to add: <meta http-equiv="Content-Security-Policy" content="default-src \'self\'">.',
-          location: 'Site-wide (HTTP Header)'
+          remediation: 'Add via meta tag: <meta http-equiv="Content-Security-Policy" content="default-src \'self\'; script-src \'self\' https://cdn.jsdelivr.net https://unpkg.com; style-src \'self\' https://cdn.tailwindcss.com; img-src \'self\' data:; frame-src \'none\';"> or request Webflow to set header.',
+          location: 'Site-wide (HTTP Header or Meta)'
         },
         {
+          name: 'X-Frame-Options',
           severity: SEVERITY.Informational,
-          title: 'X-Frame-Options',
           description: 'Prevents clickjacking by controlling iframe embedding.',
           remediation: 'Request Webflow to set: X-Frame-Options: DENY.',
           location: 'Site-wide (HTTP Header)'
         },
         {
+          name: 'Strict-Transport-Security',
           severity: SEVERITY.Informational,
-          title: 'Strict-Transport-Security (HSTS)',
           description: 'Enforces HTTPS, protecting against man-in-the-middle attacks.',
           remediation: 'Request Webflow to set: Strict-Transport-Security: max-age=31536000; includeSubDomains.',
           location: 'Site-wide (HTTP Header)'
         },
         {
+          name: 'X-Content-Type-Options',
           severity: SEVERITY.Informational,
-          title: 'X-Content-Type-Options',
           description: 'Prevents MIME-type sniffing, reducing risks from misinterpreted files.',
           remediation: 'Request Webflow to set: X-Content-Type-Options: nosniff.',
           location: 'Site-wide (HTTP Header)'
         },
         {
+          name: 'Referrer-Policy',
           severity: SEVERITY.Informational,
-          title: 'Referrer-Policy',
           description: 'Controls referrer information sent with requests.',
-          remediation: 'Use meta tag: <meta name="referrer" content="strict-origin-when-cross-origin"> or request header.',
+          remediation: 'Add via meta tag: <meta name="referrer" content="strict-origin-when-cross-origin"> or request header.',
           location: 'Site-wide (HTTP Header or Meta)'
         },
         {
+          name: 'Permissions-Policy',
           severity: SEVERITY.Informational,
-          title: 'Permissions-Policy',
           description: 'Controls browser features like geolocation or camera access.',
-          remediation: 'Use meta tag or header: Permissions-Policy: geolocation=(), camera=().',
+          remediation: 'Add via meta tag: <meta name="Permissions-Policy" content="geolocation=(), camera=()"> or request header.',
           location: 'Site-wide (HTTP Header or Meta)'
         }
       ];
 
-      // Optional: Fetch contextual advice from backend
-      /*
-      try {
-        const response = await fetch('https://your-backend-api/header-rules', {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
+      // Update headers with implementation status
+      headers.forEach(header => {
+        const implemented = implementedHeaders.find(h => h.name === header.name);
+        issues.push({
+          severity: header.severity,
+          title: header.name,
+          description: header.description,
+          location: header.location,
+          status: implemented ? `Implemented (${implemented.type}: ${implemented.value})` : 'Not implemented',
+          remediation: implemented ? 'No further action needed.' : header.remediation
         });
-        const customHeaders = await response.json();
-        headers.push(...customHeaders);
-      } catch (error) {
-        console.error('Error fetching header rules:', error);
-      }
-      */
+      });
 
-      issues = headers;
       displayResults(issues, 'security header');
       progressDiv.classList.add('hidden');
     }
@@ -404,18 +470,12 @@
 
     // Event Listeners
     document.getElementById('runScanBtn').addEventListener('click', runFullScan);
+    document.getElementById('injectHeadersBtn').addEventListener('click', injectSecurityHeaders);
     document.getElementById('severityFilter').addEventListener('change', () => displayResults(issues, 'filtered'));
     document.getElementById('sortIssuesBtn').addEventListener('click', () => {
       document.getElementById('sortIssuesBtn').dataset.sorted = 'true';
       displayResults(issues, 'sorted');
     });
-
-    // Real-time Scanning (basic event listener for code changes, if SDK supports)
-    /*
-    webflow.on('customCodeChanged', () => {
-      analyzeCustomCode(); // Trigger on code change (if SDK supports)
-    });
-    */
 
     // Initialize App
     document.addEventListener('DOMContentLoaded', () => {
@@ -425,7 +485,6 @@
         return;
       }
       setupTabs();
-      // Default to Custom Code tab
       document.getElementById('tabCode').click();
     });
   </script>
