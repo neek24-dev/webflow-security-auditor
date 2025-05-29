@@ -64,6 +64,21 @@
       display: none;
       z-index: 50;
     }
+    /* Custom styles for header boxes */
+    .injectable-box {
+      border: 2px solid #10b981;
+      background-color: #ecfdf5;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    .non-injectable-box {
+      border: 2px solid #f59e0b;
+      background-color: #fffbeb;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
   </style>
 </head>
 <body class="bg-gray-100 font-sans">
@@ -623,19 +638,18 @@
       progressDiv.textContent = 'Attempting to inject all recommended headers...';
 
       try {
-        // Headers that can be injected via meta tags
         const injectableHeaders = `
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' https://cdn.tailwindcss.com; img-src 'self' data:; frame-src 'none';">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="Permissions-Policy" content="geolocation=(), camera=()">
         `;
 
-        // Instructions for headers that must be set by Webflow
         const manualHeaders = `
 For the following headers, request Webflow to set them in the site settings:
 - X-Frame-Options: DENY
 - Strict-Transport-Security: max-age=31536000; includeSubDomains
 - X-Content-Type-Options: nosniff
+Contact Webflow Support for assistance: https://university.webflow.com/support
         `;
 
         if (webflow.setCustomCode) {
@@ -643,10 +657,22 @@ For the following headers, request Webflow to set them in the site settings:
             head: injectableHeaders
           });
           resultsDiv.innerHTML = `
-            <p class="text-green-600">Successfully injected meta tag headers (Content-Security-Policy, Referrer-Policy, Permissions-Policy).</p>
-            <p class="text-yellow-600">Some headers cannot be set via meta tags. Please follow the instructions below:</p>
-            <pre class="bg-gray-100 p-2 rounded">${manualHeaders}</pre>
-            <button id="copyManualHeadersBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-2">Copy Instructions</button>
+            <div class="injectable-box">
+              <h3 class="text-lg font-semibold text-green-700 mb-2">Injectable Headers</h3>
+              <p class="text-green-600 mb-2">Successfully injected the following headers via meta tags:</p>
+              <ul class="list-disc list-inside mb-2">
+                <li>Content-Security-Policy</li>
+                <li>Referrer-Policy</li>
+                <li>Permissions-Policy</li>
+              </ul>
+              <pre class="bg-white p-2 rounded border border-green-300">${injectableHeaders}</pre>
+            </div>
+            <div class="non-injectable-box">
+              <h3 class="text-lg font-semibold text-yellow-700 mb-2">Non-Injectable Headers</h3>
+              <p class="text-yellow-600 mb-2">The following headers must be set by Webflow:</p>
+              <pre class="bg-white p-2 rounded border border-yellow-300">${manualHeaders}</pre>
+              <button id="copyManualHeadersBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-2">Copy Instructions</button>
+            </div>
           `;
           document.getElementById('copyManualHeadersBtn')?.addEventListener('click', () => {
             navigator.clipboard.writeText(manualHeaders);
@@ -660,9 +686,12 @@ ${injectableHeaders}
 ${manualHeaders}
           `;
           resultsDiv.innerHTML = `
-            <p class="text-yellow-600">Automatic injection not supported by SDK. Copy the instructions below to add headers manually:</p>
-            <pre class="bg-gray-100 p-2 rounded">${allInstructions}</pre>
-            <button id="copyAllHeadersBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-2">Copy All Instructions</button>
+            <div class="non-injectable-box">
+              <h3 class="text-lg font-semibold text-yellow-700 mb-2">Injection Not Supported</h3>
+              <p class="text-yellow-600 mb-2">Automatic injection not supported by SDK. Copy the instructions below to add headers manually:</p>
+              <pre class="bg-white p-2 rounded border border-yellow-300">${allInstructions}</pre>
+              <button id="copyAllHeadersBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-2">Copy All Instructions</button>
+            </div>
           `;
           document.getElementById('copyAllHeadersBtn')?.addEventListener('click', () => {
             navigator.clipboard.writeText(allInstructions);
@@ -791,7 +820,7 @@ ${manualHeaders}
       await recommendSecurityHeaders();
       issues = [...issues];
       displayResults(issues, 'full scan');
-      document.getElementById('tabHeaders').click(); // Switch to Headers tab to show results
+      document.getElementById('tabHeaders').click();
     }
 
     function setupTabs() {
