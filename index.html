@@ -16,6 +16,7 @@
       overflow: hidden;
       height: auto;
       width: auto;
+      box-sizing: border-box;
     }
     /* Remove scrollbar from results div and allow content to expand */
     #results {
@@ -30,6 +31,7 @@
       height: auto;
       width: 100%;
       max-width: none;
+      box-sizing: border-box;
     }
     /* Make content responsive */
     .container > div {
@@ -115,9 +117,23 @@
     // Function to resize iframe dynamically
     function resizeIframe() {
       if (webflow && webflow.resize) {
-        // Calculate dimensions
-        const height = document.documentElement.scrollHeight + 20; // Add padding
-        const width = document.documentElement.scrollWidth + 20;   // Add padding
+        // Calculate dimensions based on content
+        const body = document.body;
+        const html = document.documentElement;
+        const height = Math.max(
+          body.scrollHeight,
+          body.offsetHeight,
+          html.clientHeight,
+          html.scrollHeight,
+          html.offsetHeight
+        ) + 20; // Add padding
+        const width = Math.max(
+          body.scrollWidth,
+          body.offsetWidth,
+          html.clientWidth,
+          html.scrollWidth,
+          html.offsetWidth
+        ) + 20; // Add padding
         // Attempt to resize both dimensions
         try {
           webflow.resize({ height: height, width: width });
@@ -145,6 +161,28 @@
     }
 
     const debouncedResizeIframe = debounce(resizeIframe, 100);
+
+    // Set up ResizeObserver to monitor content size changes
+    function setupResizeObserver() {
+      const resultsDiv = document.getElementById('results');
+      const observer = new ResizeObserver(() => {
+        debouncedResizeIframe();
+      });
+      // Observe the results div and the body for size changes
+      observer.observe(resultsDiv);
+      observer.observe(document.body);
+    }
+
+    // MutationObserver to detect DOM changes
+    function setupMutationObserver() {
+      const targetNode = document.getElementById('resultsContent');
+      const config = { childList: true, subtree: true, characterData: true };
+      const callback = () => {
+        debouncedResizeIframe();
+      };
+      const observer = new MutationObserver(callback);
+      observer.observe(targetNode, config);
+    }
 
     // Display results with severity, snippets, and remediation
     function displayResults(results, type) {
@@ -425,7 +463,7 @@
         const siteInfo = await webflow.getSiteInfo();
         const domain = siteInfo.domain || siteInfo.publishedDomains?.[0]; // Get site domain
         if (domain) {
-          const response = await fetch('https://your-app-name.netlify.app/.netlify/functions/check-headers', {
+          const response = await fetch('https://webflow-security-auditor.netlify.app/.netlify/functions/check-headers', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url: `https://${domain}` })
@@ -567,6 +605,8 @@
         return;
       }
       setupTabs();
+      setupResizeObserver();
+      setupMutationObserver();
       document.getElementById('tabCode').click();
       // Initial resize
       debouncedResizeIframe();
