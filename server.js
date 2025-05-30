@@ -23,17 +23,22 @@ fastify.get('/auth', async (request, reply) => {
     const authUrl = `https://webflow.com/oauth/authorize?${params.toString()}`;
     reply.redirect(authUrl);
   } else {
-    // Exchange code for access token using axios
-    const tokenRes = await axios.post('https://api.webflow.com/oauth/access_token', {
-      client_id: process.env.CLIENT_ID,
-      client_secret: process.env.CLIENT_SECRET,
-      code,
-      grant_type: 'authorization_code',
-      redirect_uri: 'http://localhost:3000/auth'
-    });
-    const accessToken = tokenRes.data.access_token;
-    const idToken = jwt.sign({ accessToken }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    reply.send({ idToken });
+    try {
+      // Exchange code for access token using axios
+      const tokenRes = await axios.post('https://api.webflow.com/oauth/token', {
+        client_id: process.env.CLIENT_ID,
+        client_secret: process.env.CLIENT_SECRET,
+        code,
+        grant_type: 'authorization_code',
+        redirect_uri: 'http://localhost:3000/auth'
+      });
+      const accessToken = tokenRes.data.access_token;
+      const idToken = jwt.sign({ accessToken }, process.env.JWT_SECRET, { expiresIn: '1h' });
+      reply.send({ idToken });
+    } catch (error) {
+      console.error('OAuth Error:', error.response?.data || error.message);
+      reply.status(500).send({ error: 'Failed to exchange code for access token' });
+    }
   }
 });
 
@@ -151,7 +156,7 @@ fastify.post('/monitor-resources', async (request, reply) => {
     );
 
     // Flag Suspicious Resources
-    const suspicious = externalResources.filter(res => !res.url.includes(url.split('/')[2])); // Not from same domain
+    const suspicious = externalResources.filter(res => !res.url.includes(url.split('/')[2]));
     reply.send({ resources: externalResources, suspicious });
   } catch (error) {
     reply.status(401).send({ error: 'Unauthorized' });
@@ -161,7 +166,6 @@ fastify.post('/monitor-resources', async (request, reply) => {
 // Helper to Extract Links
 function extractLinksFromContent(content) {
   const links = [];
-  // Simplified: assumes content.links is an array of { url, text }
   if (content.links) {
     links.push(...content.links.map(link => ({ url: link.url, text: link.text || 'No text' })));
   }
