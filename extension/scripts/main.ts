@@ -1,7 +1,7 @@
 // src/scripts/main.js
-import { debounce } from './utils.js';
+import { debounce } from '../../extension/scripts/utils.js';
 import { resizeIframe, displayResults } from './ui.js';
-import { analyzeCustomCode, auditExternalResources, recommendSecurityHeaders } from './security.js';
+import { analyzeCustomCode, auditExternalResources, recommendSecurityHeaders } from '../../extension/scripts/security.js';
 import { checkBrokenLinks } from './links.js';
 import { toggleMonitoring } from './monitoring.js';
 

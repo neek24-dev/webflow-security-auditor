@@ -1,6 +1,6 @@
 // src/scripts/links.js
 import { SEVERITY } from './constants.js';
-import { displayBrokenLinks } from './ui.js';
+import { displayBrokenLinks } from '../../src/scripts/ui.js';
 
 export async function isInternalLink(baseUrl, linkUrl) {
   try {

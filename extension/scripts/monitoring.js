@@ -1,6 +1,6 @@
 // src/scripts/monitoring.js
 import { SEVERITY } from './constants.js';
-import { updateBadge, showToast } from './ui.js';
+import { updateBadge, showToast } from '../../src/scripts/ui.js';
 import { detectImplementedHeaders } from './security.js';
 import { crawlSiteForBrokenLinks } from './links.js';
 

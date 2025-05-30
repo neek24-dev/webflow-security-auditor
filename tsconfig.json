@@ -110,6 +110,6 @@
     // "skipDefaultLibCheck": true,                      /* Skip type checking .d.ts files that are included with TypeScript. */
     "skipLibCheck": true                                 /* Skip type checking all .d.ts files. */
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "extension/scripts/utils.ts", "extension/scripts/security.js", "extension/scripts/constants.js", "extension/scripts/links.js", "extension/scripts/monitoring.js", "extension/scripts/utils.test.js"],
   "exclude": ["node_modules"]
 }

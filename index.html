@@ -153,13 +153,13 @@
   </div>
 
   <!-- Load scripts during development -->
-  <script type="module">
-    import * as utils from './scripts/utils.js';
-    window.escapeHTML = utils.escapeHTML; // Expose to global scope
-    import * as security from './scripts/security.js';
-    window.injectSecurityHeaders = security.injectSecurityHeaders;
-    window.injectAllRecommendedHeaders = security.injectAllRecommendedHeaders;
-    import './scripts/main.js';
-  </script>
+ <script type="module">
+import * as utils from './scripts/utils.js';
+window.escapeHTML = utils.escapeHTML;
+import * as security from './scripts/security.js';
+window.injectSecurityHeaders = security.injectSecurityHeaders;
+window.injectAllRecommendedHeaders = security.injectAllRecommendedHeaders;
+import './scripts/main.js';
+</script>
 </body>
 </html>

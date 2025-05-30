@@ -1,4 +1,4 @@
-import { SEVERITY } from './constants.js';
+import { SEVERITY } from '../../extension/scripts/constants.js';
 import { displayResults } from './ui.js';
 
 export async function analyzeCustomCode() {

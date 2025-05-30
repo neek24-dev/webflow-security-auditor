@@ -5,10 +5,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Webflow Security Auditor</title>
-  <!-- Include Inter font from Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <!-- Include Tailwind CSS (already compiled via build:css script) -->
-  <link rel="stylesheet" href="/styles.css">
+  <!-- Precompiled Tailwind CSS -->
+  <link rel="stylesheet" href="styles/styles.css">
+  <!-- Webflow Apps SDK (assumed injected by Webflow) -->
+  <script src="https://sdk.webflow.com/js/webflow-apps.js"></script>
+  <!-- Axios for HTTP requests -->
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <!-- Cheerio (loaded via CDN for simplicity in Webflow app context) -->
+  <script src="https://cdn.jsdelivr.net/npm/cheerio@1.0.0-rc.12/dist/browser/cheerio.min.js"></script>
   <style>
     body {
       font-family: 'Inter', sans-serif;
@@ -19,47 +23,54 @@
     }
   </style>
 </head>
-<body class="space-y-4"> <!-- Consistent spacing rhythm (4px multiples) -->
-  <!-- Header -->
-  <h1 class="text-xl font-semibold text-gray-800">Webflow security auditor</h1>
-  <p class="text-sm text-gray-600">Scan your site for security issues.</p>
+<body class="bg-gray-100 font-sans">
+  <div class="container mx-auto p-4 flex flex-col">
+    <!-- Header -->
+    <h1 class="text-xl font-semibold text-gray-800">Webflow security auditor</h1>
+    <p class="text-sm text-gray-600">Scan your site for security issues.</p>
 
-  <!-- Buttons for Actions (Full-width, Vertical) -->
-  <div class="space-y-2">
-    <button id="checkLinksBtn" class="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Check for broken links">
-      Check for broken links
-    </button>
-    <button id="securityAuditBtn" class="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Run security audit">
-      Run security audit
-    </button>
-    <button id="monitorResourcesBtn" class="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Monitor external resources">
-      Monitor external resources
+    <!-- Buttons for Actions (Full-width, Vertical) -->
+    <div class="space-y-2">
+      <button id="checkLinksBtn" class="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Check for broken links">
+        Check for broken links
+      </button>
+      <button id="securityAuditBtn" class="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Run security audit">
+        Run security audit
+      </button>
+      <button id="monitorResourcesBtn" class="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Monitor external resources">
+        Monitor external resources
+      </button>
+    </div>
+
+    <!-- Results Section -->
+    <div id="results" class="space-y-2 hidden">
+      <h2 class="text-lg font-medium text-gray-800">Results</h2>
+      <ul id="resultsList" class="space-y-2" role="list"></ul>
+    </div>
+
+    <!-- Error Message -->
+    <div id="error" class="hidden p-2 bg-red-100 text-red-800 rounded-md" role="alert"></div>
+
+    <!-- Loading Indicator -->
+    <div id="loading" class="hidden flex items-center space-x-2 text-gray-600">
+      <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+      </svg>
+      <span>Loading...</span>
+    </div>
+
+    <!-- Deep Linking Button -->
+    <button id="back-to-designer" class="w-full py-2 px-4 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500" aria-label="Back to Webflow Designer">
+      Back to Designer
     </button>
   </div>
-
-  <!-- Results Section -->
-  <div id="results" class="space-y-2 hidden">
-    <h2 class="text-lg font-medium text-gray-800">Results</h2>
-    <ul id="resultsList" class="space-y-2" role="list"></ul>
+  <div id="toast">
+    <p id="toastMessage"></p>
+    <button id="viewChangesBtn" class="underline text-blue-300">View Changes</button>
   </div>
 
-  <!-- Error Message -->
-  <div id="error" class="hidden p-2 bg-red-100 text-red-800 rounded-md" role="alert"></div>
-
-  <!-- Loading Indicator -->
-  <div id="loading" class="hidden flex items-center space-x-2 text-gray-600">
-    <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-    </svg>
-    <span>Loading...</span>
-  </div>
-
-  <!-- Deep Linking Button -->
-  <button id="back-to-designer" class="w-full py-2 px-4 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500" aria-label="Back to Webflow Designer">
-    Back to Designer
-  </button>
-
-  <script type="module" src="extension.js"></script>
+  <!-- Only reference the bundled JS file -->
+  <script type="module" src="extension.min.js"></script>
 </body>
 </html>

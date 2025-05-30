@@ -1,5 +1,5 @@
 import { SEVERITY } from './constants.js';
-import { displayResults } from './ui.js';
+import { displayResults } from '../../src/scripts/ui.js';
 
 export async function analyzeCustomCode() {
   const resultsDiv = document.getElementById('resultsContent');
