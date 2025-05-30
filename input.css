@@ -1,3 +1,17 @@
+/* input.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Custom styles for Webflow Designer */
+body {
+  @apply text-gray-800 bg-gray-100;
+}
+
+h1, h2 {
+  @apply font-semibold;
+}
+
+button {
+  @apply transition duration-200;
+}

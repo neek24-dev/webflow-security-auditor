@@ -3,77 +3,63 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Webflow Security Auditor</title>
+  <!-- Include Inter font from Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Include Tailwind CSS (already compiled via build:css script) -->
+  <link rel="stylesheet" href="../styles.css">
   <style>
     body {
-      font-family: Arial, sans-serif;
-      padding: 10px;
-      background: #fff;
-      color: #333;
-    }
-    .tab-buttons {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 10px;
-    }
-    .tab-button {
-      padding: 8px 16px;
-      background: #007bff;
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    .tab-button:hover {
-      background: #0056b3;
-    }
-    .tab-button.active {
-      background: #0056b3;
-    }
-    .tab-content {
-      display: none;
-    }
-    .tab-content.active {
-      display: block;
-    }
-    .results {
-      margin-top: 10px;
-    }
-    ul {
-      list-style: none;
-      padding: 0;
-    }
-    li {
-      margin: 5px 0;
-      padding: 5px;
-      background: #f8f9fa;
-      border-radius: 4px;
-    }
-    .error {
-      color: #dc3545;
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 16px;
+      background-color: #f5f5f5; /* Light background for contrast */
+      color: #1a1a1a; /* Dark text for readability */
     }
   </style>
 </head>
-<body>
-  <h2>Webflow Security Auditor</h2>
-  <div class="tab-buttons">
-    <button class="tab-button active" data-tab="broken-links">Broken Links</button>
-    <button class="tab-button" data-tab="security-audit">Security Audit</button>
-    <button class="tab-button" data-tab="external-resources">External Resources</button>
+<body class="space-y-4"> <!-- Consistent spacing rhythm (4px multiples) -->
+  <!-- Header -->
+  <h1 class="text-xl font-semibold text-gray-800">Webflow security auditor</h1>
+  <p class="text-sm text-gray-600">Scan your site for security issues.</p>
+
+  <!-- Buttons for Actions (Full-width, Vertical) -->
+  <div class="space-y-2">
+    <button id="checkLinksBtn" class="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Check for broken links">
+      Check for broken links
+    </button>
+    <button id="securityAuditBtn" class="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Run security audit">
+      Run security audit
+    </button>
+    <button id="monitorResourcesBtn" class="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Monitor external resources">
+      Monitor external resources
+    </button>
   </div>
-  <div id="broken-links" class="tab-content active">
-    <button id="check-links">Check for Broken Links</button>
-    <div id="links-results" class="results"></div>
+
+  <!-- Results Section -->
+  <div id="results" class="space-y-2 hidden">
+    <h2 class="text-lg font-medium text-gray-800">Results</h2>
+    <ul id="resultsList" class="space-y-2" role="list"></ul>
   </div>
-  <div id="security-audit" class="tab-content">
-    <button id="run-security-audit">Run Security Audit</button>
-    <div id="security-results" class="results"></div>
+
+  <!-- Error Message -->
+  <div id="error" class="hidden p-2 bg-red-100 text-red-800 rounded-md" role="alert"></div>
+
+  <!-- Loading Indicator -->
+  <div id="loading" class="hidden flex items-center space-x-2 text-gray-600">
+    <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+    </svg>
+    <span>Loading...</span>
   </div>
-  <div id="external-resources" class="tab-content">
-    <button id="monitor-resources">Monitor Resources</button>
-    <div id="resources-results" class="results"></div>
-  </div>
-  <button id="back-to-designer">Back to Designer</button>
-  <script src="./extension.js"></script>
+
+  <!-- Deep Linking Button -->
+  <button id="back-to-designer" class="w-full py-2 px-4 bg-gray-600 text-white rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500" aria-label="Back to Webflow Designer">
+    Back to Designer
+  </button>
+
+  <script type="module" src="extension.js"></script>
 </body>
 </html>
