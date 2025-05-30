@@ -1,0 +1,79 @@
+<!-- extension/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Webflow Security Auditor</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 10px;
+      background: #fff;
+      color: #333;
+    }
+    .tab-buttons {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .tab-button {
+      padding: 8px 16px;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .tab-button:hover {
+      background: #0056b3;
+    }
+    .tab-button.active {
+      background: #0056b3;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .results {
+      margin-top: 10px;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+    }
+    li {
+      margin: 5px 0;
+      padding: 5px;
+      background: #f8f9fa;
+      border-radius: 4px;
+    }
+    .error {
+      color: #dc3545;
+    }
+  </style>
+</head>
+<body>
+  <h2>Webflow Security Auditor</h2>
+  <div class="tab-buttons">
+    <button class="tab-button active" data-tab="broken-links">Broken Links</button>
+    <button class="tab-button" data-tab="security-audit">Security Audit</button>
+    <button class="tab-button" data-tab="external-resources">External Resources</button>
+  </div>
+  <div id="broken-links" class="tab-content active">
+    <button id="check-links">Check for Broken Links</button>
+    <div id="links-results" class="results"></div>
+  </div>
+  <div id="security-audit" class="tab-content">
+    <button id="run-security-audit">Run Security Audit</button>
+    <div id="security-results" class="results"></div>
+  </div>
+  <div id="external-resources" class="tab-content">
+    <button id="monitor-resources">Monitor Resources</button>
+    <div id="resources-results" class="results"></div>
+  </div>
+  <button id="back-to-designer">Back to Designer</button>
+  <script src="./extension.js"></script>
+</body>
+</html>
