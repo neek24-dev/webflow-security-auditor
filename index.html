@@ -231,7 +231,7 @@
         <h3 class="text-lg font-semibold mb-2">Detected Changes</h3>
         ${changes.map(change => `
           <div class="mb-4 p-2 border-l-4 ${change.severity === 'High' ? 'border-red-600' : change.severity === 'Medium' ? 'border-yellow-600' : 'border-gray-400'}">
-            <p class="font-bold text-${change.severity === 'High' ? 'red' : change.severity === 'Medium' ? 'yellow' : 'gray'}-600">${change.severity}: ${change.title}</p>
+            <p class="font-bold text-${change.severity === 'High' ? 'red' : change.severity === 'Medium' ? 'yellow'}-600">${change.severity}: ${change.title}</p>
             <p>${change.description}</p>
             <p><strong>Type:</strong> ${change.type}</p>
             <p><strong>Status:</strong> ${change.status}</p>
@@ -263,7 +263,7 @@
       const resolvedIssues = lastResults.filter(oldIssue => 
         !newResults.some(newIssue => 
           newIssue.title === oldIssue.title && 
-          oldIssue.description === oldIssue.description && 
+          newIssue.description === oldIssue.description && 
           oldIssue.location === oldIssue.location
         )
       );
@@ -367,10 +367,16 @@
         });
 
         // Check for broken links during monitoring
-        const siteInfo = await webflow.getSiteInfo();
-        const startUrl = `https://${siteInfo.domain || siteInfo.publishedDomains?.[0]}`;
-        if (startUrl) {
-          brokenLinksIssues = await crawlSiteForBrokenLinks(startUrl);
+        try {
+          const siteInfo = await webflow.getSiteInfo();
+          const startUrl = siteInfo?.domain || siteInfo?.publishedDomains?.[0] ? `https://${siteInfo.domain || siteInfo.publishedDomains[0]}` : null;
+          if (startUrl) {
+            brokenLinksIssues = await crawlSiteForBrokenLinks(startUrl);
+          } else {
+            console.warn('Skipping broken link check: Unable to determine site URL during monitoring.');
+          }
+        } catch (error) {
+          console.error('Error checking broken links during monitoring:', error);
         }
 
         const codeChanges = detectChanges(customCodeIssues, 'customCode');
@@ -434,7 +440,7 @@
       } else {
         resultsDiv.innerHTML = filteredIssues.map(issue => `
           <div class="mb-4 p-2 border-l-4 ${issue.severity === 'High' ? 'border-red-600' : issue.severity === 'Medium' ? 'border-yellow-600' : 'border-gray-400'}">
-            <p class="font-bold text-${issue.severity === 'High' ? 'red' : issue.severity === 'Medium' ? 'yellow' : 'gray'}-600">${issue.severity}: ${issue.title}</p>
+            <p class="font-bold text-${issue.severity === 'High' ? 'red' : issue.severity === 'Medium' ? 'yellow'}-600">${issue.severity}: ${issue.title}</p>
             <p>${issue.description}</p>
             ${issue.snippet ? `<pre class="bg-gray-100 p-2 rounded">${issue.snippet}</pre>` : ''}
             <p><strong>Location:</strong> ${issue.location || 'N/A'}</p>
@@ -883,20 +889,35 @@ Contact Webflow Support for assistance: https://university.webflow.com/support
     }
 
     async function isInternalLink(baseUrl, linkUrl) {
-      const baseNetloc = new URL(baseUrl).hostname;
-      const linkNetloc = new URL(linkUrl).hostname;
-      return baseNetloc === linkNetloc;
+      try {
+        const baseNetloc = new URL(baseUrl).hostname;
+        const linkNetloc = new URL(linkUrl).hostname;
+        return baseNetloc === linkNetloc;
+      } catch (error) {
+        console.error(`Error determining if link is internal: ${linkUrl}`, error);
+        return false; // Assume external if URL parsing fails
+      }
     }
 
     async function getAllLinks(htmlContent, baseUrl) {
-      const $ = cheerio.load(htmlContent);
-      const links = new Set();
-      $('a[href]').each((i, aTag) => {
-        let href = $(aTag).attr('href').trim();
-        const absoluteLink = new URL(href, baseUrl).href.split('#')[0]; // Handle relative URLs and remove fragments
-        links.add(absoluteLink);
-      });
-      return Array.from(links);
+      try {
+        const $ = cheerio.load(htmlContent);
+        const links = new Set();
+        $('a[href]').each((i, aTag) => {
+          let href = $(aTag).attr('href').trim();
+          if (!href) return;
+          try {
+            const absoluteLink = new URL(href, baseUrl).href.split('#')[0]; // Handle relative URLs and remove fragments
+            links.add(absoluteLink);
+          } catch (error) {
+            console.warn(`Skipping invalid href in ${baseUrl}: ${href}`, error);
+          }
+        });
+        return Array.from(links);
+      } catch (error) {
+        console.error(`Error parsing HTML for links in ${baseUrl}:`, error);
+        return [];
+      }
     }
 
     async function checkLinkStatus(url) {
@@ -913,7 +934,8 @@ Contact Webflow Support for assistance: https://university.webflow.com/support
         if (error.response) {
           return error.response.status;
         }
-        return `Error: ${error.message}`;
+        console.warn(`Error checking link status for ${url}: ${error.message}`);
+        return `Error: ${error.message}`; // Return error message for reporting
       }
     }
 
@@ -927,7 +949,15 @@ Contact Webflow Support for assistance: https://university.webflow.com/support
       visitedUrls.clear();
       brokenLinksReport.length = 0;
 
-      urlsToVisit.push(startUrl);
+      try {
+        // Validate startUrl
+        new URL(startUrl); // Throws if invalid
+        urlsToVisit.push(startUrl);
+      } catch (error) {
+        console.error('Invalid start URL:', startUrl, error);
+        progressDiv.classList.add('hidden');
+        throw new Error(`Invalid start URL: ${startUrl}. Please ensure the site URL is correct.`);
+      }
 
       while (urlsToVisit.length > 0) {
         const currentUrl = urlsToVisit.shift();
@@ -954,7 +984,7 @@ Contact Webflow Support for assistance: https://university.webflow.com/support
             continue;
           }
 
-          if (response.headers['content-type'].includes('text/html')) {
+          if (response.headers['content-type']?.includes('text/html')) {
             const foundLinks = await getAllLinks(response.data, currentUrl);
             for (const link of foundLinks) {
               if (visitedUrls.has(link)) continue;
@@ -980,9 +1010,10 @@ Contact Webflow Support for assistance: https://university.webflow.com/support
             }
           }
         } catch (error) {
+          const errorMsg = error.response ? error.response.status : `Error: ${error.message}`;
           brokenLinksReport.push({
             broken_link_url: currentUrl,
-            status_code: error.response ? error.response.status : `Error: ${error.message}`,
+            status_code: errorMsg,
             source_page_url: currentUrl
           });
         }
@@ -1001,20 +1032,50 @@ Contact Webflow Support for assistance: https://university.webflow.com/support
     }
 
     async function checkBrokenLinks() {
+      const resultsDiv = document.getElementById('resultsContent');
+      const progressDiv = document.getElementById('progress');
+      progressDiv.classList.remove('hidden');
+      progressDiv.textContent = 'Preparing to scan for broken links...';
+
+      if (!webflow) {
+        progressDiv.classList.add('hidden');
+        resultsDiv.innerHTML = '<p class="text-red-600">Webflow Apps SDK not loaded. Ensure the app is running in the Webflow Designer.</p>';
+        return;
+      }
+
       try {
         const siteInfo = await webflow.getSiteInfo();
-        const startUrl = `https://${siteInfo.domain || siteInfo.publishedDomains?.[0]}`;
-        if (!startUrl) {
-          throw new Error('Unable to determine site URL.');
+        if (!siteInfo) {
+          throw new Error('Failed to retrieve site information from Webflow SDK.');
         }
+
+        const domain = siteInfo.domain || siteInfo.publishedDomains?.[0];
+        if (!domain) {
+          throw new Error('No domain or published domains found for this site.');
+        }
+
+        const startUrl = `https://${domain}`;
+        progressDiv.textContent = `Starting scan with URL: ${startUrl}`;
+        console.log(`Starting broken link scan for: ${startUrl}`);
 
         const brokenLinksIssues = await crawlSiteForBrokenLinks(startUrl);
         displayBrokenLinks(brokenLinksReport);
       } catch (error) {
         console.error('Error checking broken links:', error);
-        const resultsDiv = document.getElementById('resultsContent');
-        resultsDiv.innerHTML = '<p class="text-red-600">Error checking broken links. Please try again.</p>';
-        document.getElementById('progress').classList.add('hidden');
+        progressDiv.classList.add('hidden');
+        let errorMessage = 'Error checking broken links.';
+        if (error.message.includes('Webflow Apps SDK')) {
+          errorMessage = 'Webflow Apps SDK not loaded. Ensure the app is running in the Webflow Designer.';
+        } else if (error.message.includes('site information')) {
+          errorMessage = 'Failed to retrieve site information. Ensure the site is published and accessible.';
+        } else if (error.message.includes('No domain')) {
+          errorMessage = 'No domain found for this site. Ensure the site has a published domain.';
+        } else if (error.message.includes('Invalid start URL')) {
+          errorMessage = error.message;
+        } else {
+          errorMessage = `Error checking broken links: ${error.message}`;
+        }
+        resultsDiv.innerHTML = `<p class="text-red-600">${errorMessage}</p>`;
       }
     }
 
