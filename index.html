@@ -263,7 +263,7 @@
       const resolvedIssues = lastResults.filter(oldIssue => 
         !newResults.some(newIssue => 
           newIssue.title === oldIssue.title && 
-          newIssue.description === oldIssue.description && 
+          oldIssue.description === oldIssue.description && 
           oldIssue.location === oldIssue.location
         )
       );
@@ -366,7 +366,6 @@
           });
         });
 
-        // Check for broken links during monitoring
         try {
           const siteInfo = await webflow.getSiteInfo();
           const startUrl = siteInfo?.domain || siteInfo?.publishedDomains?.[0] ? `https://${siteInfo.domain || siteInfo.publishedDomains[0]}` : null;
@@ -895,7 +894,7 @@ Contact Webflow Support for assistance: https://university.webflow.com/support
         return baseNetloc === linkNetloc;
       } catch (error) {
         console.error(`Error determining if link is internal: ${linkUrl}`, error);
-        return false; // Assume external if URL parsing fails
+        return false;
       }
     }
 
@@ -907,7 +906,7 @@ Contact Webflow Support for assistance: https://university.webflow.com/support
           let href = $(aTag).attr('href').trim();
           if (!href) return;
           try {
-            const absoluteLink = new URL(href, baseUrl).href.split('#')[0]; // Handle relative URLs and remove fragments
+            const absoluteLink = new URL(href, baseUrl).href.split('#')[0];
             links.add(absoluteLink);
           } catch (error) {
             console.warn(`Skipping invalid href in ${baseUrl}: ${href}`, error);
@@ -935,7 +934,7 @@ Contact Webflow Support for assistance: https://university.webflow.com/support
           return error.response.status;
         }
         console.warn(`Error checking link status for ${url}: ${error.message}`);
-        return `Error: ${error.message}`; // Return error message for reporting
+        return `Error: ${error.message}`;
       }
     }
 
@@ -950,8 +949,7 @@ Contact Webflow Support for assistance: https://university.webflow.com/support
       brokenLinksReport.length = 0;
 
       try {
-        // Validate startUrl
-        new URL(startUrl); // Throws if invalid
+        new URL(startUrl);
         urlsToVisit.push(startUrl);
       } catch (error) {
         console.error('Invalid start URL:', startUrl, error);
@@ -1032,18 +1030,19 @@ Contact Webflow Support for assistance: https://university.webflow.com/support
     }
 
     async function checkBrokenLinks() {
+      console.log('checkBrokenLinks function called');
       const resultsDiv = document.getElementById('resultsContent');
       const progressDiv = document.getElementById('progress');
+      
       progressDiv.classList.remove('hidden');
       progressDiv.textContent = 'Preparing to scan for broken links...';
-
-      if (!webflow) {
-        progressDiv.classList.add('hidden');
-        resultsDiv.innerHTML = '<p class="text-red-600">Webflow Apps SDK not loaded. Ensure the app is running in the Webflow Designer.</p>';
-        return;
-      }
+      resultsDiv.innerHTML = ''; // Clear previous results
 
       try {
+        if (!webflow) {
+          throw new Error('Webflow Apps SDK not loaded. Ensure the app is running in the Webflow Designer.');
+        }
+
         const siteInfo = await webflow.getSiteInfo();
         if (!siteInfo) {
           throw new Error('Failed to retrieve site information from Webflow SDK.');
@@ -1061,7 +1060,7 @@ Contact Webflow Support for assistance: https://university.webflow.com/support
         const brokenLinksIssues = await crawlSiteForBrokenLinks(startUrl);
         displayBrokenLinks(brokenLinksReport);
       } catch (error) {
-        console.error('Error checking broken links:', error);
+        console.error('Error in checkBrokenLinks:', error);
         progressDiv.classList.add('hidden');
         let errorMessage = 'Error checking broken links.';
         if (error.message.includes('Webflow Apps SDK')) {
@@ -1130,25 +1129,58 @@ Contact Webflow Support for assistance: https://university.webflow.com/support
       observer.observe(targetNode, config);
     }
 
-    document.getElementById('runScanBtn').addEventListener('click', runFullScan);
-    document.getElementById('injectHeadersBtn').addEventListener('click', injectSecurityHeaders);
-    document.getElementById('injectAllHeadersBtn').addEventListener('click', injectAllRecommendedHeaders);
-    document.getElementById('checkBrokenLinksBtn').addEventListener('click', checkBrokenLinks);
-    document.getElementById('severityFilter').addEventListener('click', () => displayResults(issues, 'filtered'));
-    document.getElementById('sortIssuesBtn').addEventListener('click', () => {
-      document.getElementById('sortIssuesBtn').dataset.sorted = 'true';
-      displayResults(issues, 'sorted');
-    });
-    document.getElementById('monitorToggleBtn').addEventListener('click', toggleMonitoring);
-    window.addEventListener('resize', debouncedResizeIframe);
+    function setupEventListeners() {
+      const runScanBtn = document.getElementById('runScanBtn');
+      const injectHeadersBtn = document.getElementById('injectHeadersBtn');
+      const injectAllHeadersBtn = document.getElementById('injectAllHeadersBtn');
+      const checkBrokenLinksBtn = document.getElementById('checkBrokenLinksBtn');
+      const severityFilter = document.getElementById('severityFilter');
+      const sortIssuesBtn = document.getElementById('sortIssuesBtn');
+      const monitorToggleBtn = document.getElementById('monitorToggleBtn');
+
+      if (runScanBtn) runScanBtn.addEventListener('click', runFullScan);
+      else console.error('runScanBtn not found in DOM');
+
+      if (injectHeadersBtn) injectHeadersBtn.addEventListener('click', injectSecurityHeaders);
+      else console.error('injectHeadersBtn not found in DOM');
+
+      if (injectAllHeadersBtn) injectAllHeadersBtn.addEventListener('click', injectAllRecommendedHeaders);
+      else console.error('injectAllHeadersBtn not found in DOM');
+
+      if (checkBrokenLinksBtn) {
+        checkBrokenLinksBtn.addEventListener('click', () => {
+          console.log('Scan for Broken Links button clicked');
+          checkBrokenLinks();
+        });
+      } else {
+        console.error('checkBrokenLinksBtn not found in DOM');
+      }
+
+      if (severityFilter) severityFilter.addEventListener('click', () => displayResults(issues, 'filtered'));
+      else console.error('severityFilter not found in DOM');
+
+      if (sortIssuesBtn) sortIssuesBtn.addEventListener('click', () => {
+        document.getElementById('sortIssuesBtn').dataset.sorted = 'true';
+        displayResults(issues, 'sorted');
+      });
+      else console.error('sortIssuesBtn not found in DOM');
+
+      if (monitorToggleBtn) monitorToggleBtn.addEventListener('click', toggleMonitoring);
+      else console.error('monitorToggleBtn not found in DOM');
+
+      window.addEventListener('resize', debouncedResizeIframe);
+    }
 
     document.addEventListener('DOMContentLoaded', () => {
+      console.log('DOM fully loaded');
       if (!webflow) {
+        console.error('Webflow SDK not loaded');
         document.getElementById('resultsContent').innerHTML = 
           '<p class="text-red-600">Webflow Apps SDK not loaded. Ensure the app is running in the Webflow Designer.</p>';
         return;
       }
       setupTabs();
+      setupEventListeners();
       setupResizeObserver();
       setupMutationObserver();
       document.getElementById('tabCode').click();
