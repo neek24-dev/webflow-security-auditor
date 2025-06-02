@@ -1,12 +1,15 @@
 // src/scripts/utils.ts
 export async function getSiteId(webflow: any) {
+  console.log('Getting site ID from Webflow SDK...');
   const site = await webflow.getSite();
   return site.id;
 }
 
 export async function makeRequest(endpoint: string, method: string = 'GET', body: any = null) {
+  console.log(`Making request to ${endpoint} with method ${method}...`);
   const token = localStorage.getItem('idToken');
   if (!token) {
+    console.error('No ID token found');
     throw new Error('No ID token found. Please authenticate at http://localhost:3000/auth');
   }
 
@@ -19,15 +22,21 @@ export async function makeRequest(endpoint: string, method: string = 'GET', body
   };
   if (body) options.body = JSON.stringify(body);
 
+  console.log('Request options:', options);
   const response = await fetch(`http://localhost:3000${endpoint}`, options);
+  console.log('Response status:', response.status);
   if (!response.ok) {
     const error = await response.json();
+    console.error('Request failed:', error);
     throw new Error(error.error || 'Request failed');
   }
-  return response.json();
+  const data = await response.json();
+  console.log('Response data:', data);
+  return data;
 }
 
 export function displayResults(results: any[], listElement: HTMLElement) {
+  console.log('Displaying results:', results);
   listElement.innerHTML = '';
   if (results.length === 0) {
     const li = document.createElement('li');

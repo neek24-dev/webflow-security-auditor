@@ -41,32 +41,42 @@ async function init() {
   };
 
   const showToast = (message: string) => {
+    console.log('Showing toast:', message);
     toastMessage.textContent = message;
     toastDiv.classList.remove('hidden');
     setTimeout(() => {
       toastDiv.classList.add('hidden');
-    }, 3000); // Hide after 3 seconds
+    }, 3000);
   };
 
-  checkLinksBtn.addEventListener('click', () => {
-    console.log('Check for broken links clicked');
-    checkBrokenLinks(webflow, resultsDiv, resultsList, toggleLoading, showError).then(() => {
+  checkLinksBtn.addEventListener('click', async () => {
+    console.log('Check for broken links button clicked');
+    try {
+      await checkBrokenLinks(webflow, resultsDiv, resultsList, toggleLoading, showError);
       showToast('Broken links check complete');
-    });
+    } catch (error) {
+      console.error('Check broken links failed:', error);
+    }
   });
 
-  securityAuditBtn.addEventListener('click', () => {
+  securityAuditBtn.addEventListener('click', async () => {
     console.log('Run security audit clicked');
-    runSecurityAudit(webflow, siteUrlInput.value, resultsDiv, resultsList, toggleLoading, showError).then(() => {
+    try {
+      await runSecurityAudit(webflow, siteUrlInput.value, resultsDiv, resultsList, toggleLoading, showError);
       showToast('Security audit complete');
-    });
+    } catch (error) {
+      console.error('Security audit failed:', error);
+    }
   });
 
-  monitorResourcesBtn.addEventListener('click', () => {
+  monitorResourcesBtn.addEventListener('click', async () => {
     console.log('Monitor external resources clicked');
-    monitorResources(webflow, siteUrlInput.value, resultsDiv, resultsList, toggleLoading, showError).then(() => {
+    try {
+      await monitorResources(webflow, siteUrlInput.value, resultsDiv, resultsList, toggleLoading, showError);
       showToast('External resources monitoring complete');
-    });
+    } catch (error) {
+      console.error('Monitor resources failed:', error);
+    }
   });
 
   backToDesignerBtn.addEventListener('click', async () => {
