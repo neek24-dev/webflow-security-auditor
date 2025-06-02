@@ -153,7 +153,7 @@ async function init() {
       const siteId = await getSiteId();
       const siteInfo = await makeRequest(`/site-info?siteId=${siteId}`);
       const shortName = siteInfo.shortName;
-      const deepLink = `webflow://${shortName}/designer?client_id=10a4c8ebd8a6ea8b12439a4fcab4b2df27913f8404f8c1ba4c51ce0dba4742ce`;
+      const deepLink = `webflow://${shortName}/designer?client_id=YOUR_CLIENT_ID`;
       window.location.href = deepLink;
     } catch (error) {
       showError('Failed to navigate back to Designer: ' + error.message);

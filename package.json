@@ -7,6 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "build:css": "./node_modules/.bin/tailwindcss -i ./input.css -o ./styles.css --minify",
     "build": "node build.js",
+    "build:js": "esbuild src/scripts/main.ts --bundle --outfile=dist/bundle.js --format=iife --global-name=app --tsconfig=tsconfig.json --external:@webflow/designer",
+    "build:js:min": "esbuild src/scripts/main.ts --bundle --minify --outfile=dist/bundle.js --format=iife --global-name=app --tsconfig=tsconfig.json --external:@webflow/designer",
     "lint": "eslint --config .eslintrc.js src/scripts/*.js",
     "lint:fix": "eslint --config .eslintrc.js src/scripts/*.js --fix",
     "dev:client": "node server.js",
