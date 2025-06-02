@@ -19,16 +19,17 @@ export async function checkBrokenLinks(webflow: any, resultsDiv: HTMLElement, re
   } catch (error: any) {
     toggleLoading(false);
     showError(error.message);
+    throw error; // For toast
   }
 }
 
-export async function runSecurityAudit(webflow: any, resultsDiv: HTMLElement, resultsList: HTMLElement, toggleLoading: (show: boolean) => void, showError: (message: string) => void) {
+export async function runSecurityAudit(webflow: any, customUrl: string, resultsDiv: HTMLElement, resultsList: HTMLElement, toggleLoading: (show: boolean) => void, showError: (message: string) => void) {
   try {
     toggleLoading(true);
     const siteId = await getSiteId(webflow);
     const siteInfo = await makeRequest(`/site-info?siteId=${siteId}`);
     const shortName = siteInfo.shortName;
-    const url = `https://${shortName}.webflow.io`;
+    const url = customUrl || `https://${shortName}.webflow.io`;
     const audit = await makeRequest('/security-audit', 'POST', { url });
     toggleLoading(false);
     resultsDiv.classList.remove('hidden');
@@ -36,16 +37,17 @@ export async function runSecurityAudit(webflow: any, resultsDiv: HTMLElement, re
   } catch (error: any) {
     toggleLoading(false);
     showError(error.message);
+    throw error; // For toast
   }
 }
 
-export async function monitorResources(webflow: any, resultsDiv: HTMLElement, resultsList: HTMLElement, toggleLoading: (show: boolean) => void, showError: (message: string) => void) {
+export async function monitorResources(webflow: any, customUrl: string, resultsDiv: HTMLElement, resultsList: HTMLElement, toggleLoading: (show: boolean) => void, showError: (message: string) => void) {
   try {
     toggleLoading(true);
     const siteId = await getSiteId(webflow);
     const siteInfo = await makeRequest(`/site-info?siteId=${siteId}`);
     const shortName = siteInfo.shortName;
-    const url = `https://${shortName}.webflow.io`;
+    const url = customUrl || `https://${shortName}.webflow.io`;
     const resources = await makeRequest('/monitor-resources', 'POST', { url });
     toggleLoading(false);
     resultsDiv.classList.remove('hidden');
@@ -53,6 +55,7 @@ export async function monitorResources(webflow: any, resultsDiv: HTMLElement, re
   } catch (error: any) {
     toggleLoading(false);
     showError(error.message);
+    throw error; // For toast
   }
 }
 
